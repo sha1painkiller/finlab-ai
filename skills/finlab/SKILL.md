@@ -174,7 +174,7 @@ with data.universe(market='TSE_OTC', category=['水泥工業']):
 data.set_universe(market='TSE_OTC', category='半導體')
 ```
 
-Use `data.search('keyword', market='<market>')` to discover available datasets. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `data.search('營收', market='tw')`, `data.search('revenue', market='us')`).
+Use `data.search('keyword', market='<market>')` to discover available datasets. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `data.search('營收', market='tw')`, `data.search('revenue', market='us')`). Returns a `pd.Series` of dataset names *(v2.0.16; a `list` before that)* — use `.tolist()` if you need a plain list.
 
 ### Step 2: Create Factors & Conditions
 
@@ -321,7 +321,17 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 
 Short version pointers for features added in recent releases. Each reference file tags the exact API with `(vX.Y.Z)`.
 
-**v2.0.15** (2026-07-18)
+**v2.0.18** (2026-08-19)
+- `df.rank(axis=1)` **behavior fix**: the cross-sectional fast path previously assigned ordinal ranks (`method="first"`), disagreeing with the documented default `method="average"` — tied cells got distinct percentiles. Ties now share one percentile. Affects discrete / low-cardinality factors; re-check thresholds tuned before 2.0.18 — see [dataframe-reference.md](dataframe-reference.md)
+- `SinopacAccount`: contract lookup now uses shioaji >= 1.7's on-demand `api.contracts` accessor, with the legacy `fetch_contracts` path kept only for shioaji < 1.7 — see [trading-reference.md](trading-reference.md)
+
+**v2.0.17** (2026-08-02)
+- `report.get_benchmark_stats()`: benchmark metrics over the backtest period, same ffn keys as `get_stats()` — no need to recompute from `market.get_benchmark()`
+- Data cache correctness: a free-tier cache is no longer served after the account upgrades to VIP — the client rechecks authorization and refetches the full (untruncated) datasets
+- `import finlab` no longer eagerly imports pandas/numpy (~1s faster CLI startup); `finlab.FinlabDataFrame` still resolves on access
+
+**v2.0.16** (2026-07-19)
+- `data.search()` now returns a `pd.Series` (name `dataset`) instead of a `list` — filtering/`.str` methods work directly; call `.tolist()` if you need a list
 - `df.sector(by=...)`: sector accessor now accepts a custom classification — dict / `pd.Series` (stock_id → group) or a time-varying `pd.DataFrame`; unlisted stocks are excluded. Works with all `sector.*` methods — see [dataframe-reference.md](dataframe-reference.md)
 - `df.sector.map(mapping)`: broadcast group-level scalars (e.g. sector weights) to full DataFrame shape for factor composition — see [dataframe-reference.md](dataframe-reference.md)
 - `df.weight.by_group(weights, by, default)`: allocate capital across sectors/groups — normalize holdings so each group's total equals its share; under-allocation stays in cash — see [dataframe-reference.md](dataframe-reference.md)

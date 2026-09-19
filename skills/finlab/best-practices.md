@@ -126,7 +126,7 @@ data.set_universe(market='TSE_OTC', category='半導體', exclude_category='金�
 price = data.get('price:收盤價')
 ```
 
-Use `data.search('keyword', market='<market>')` to discover available datasets and `data.universe()` parameters. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `'營收'` for `tw`, `'revenue'` for `us`).
+Use `data.search('keyword', market='<market>')` to discover available datasets and `data.universe()` parameters. It returns a `pd.Series` of dataset names *(v2.0.16; a `list` before that)*. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `'營收'` for `tw`, `'revenue'` for `us`).
 
 ### ✅ Always Write `report.to_html()` After `sim()`
 
