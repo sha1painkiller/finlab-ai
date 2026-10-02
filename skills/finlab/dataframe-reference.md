@@ -268,6 +268,8 @@ top_roa = roa.is_largest(10)
 report = sim(top_roa, resample='Q')
 ```
 
+**Restrict the candidates with a mask, not multiplication.** `score[cond].is_largest(n)` ranks only stocks where `cond` is True. `(score * cond).is_largest(n)` gives failing stocks a score of 0, and on days with fewer than `n` qualifiers they fill the remaining slots. From v2.1.0 this emits `finlab.dataframe.TopNPaddingWarning` (the same applies to `is_smallest`).
+
 ---
 
 ### is_smallest
@@ -449,10 +451,12 @@ hold_until(
     nstocks_limit: int = None,
     stop_loss: float = -np.inf,
     take_profit: float = np.inf,
-    trail_stop: float | None = None,
-    trail_stop_activation: float | None = None,
+    trail_stop: float = np.inf,
+    trail_stop_activation: float = 0,
     trade_at: str = 'close',
-    rank: pd.DataFrame = None
+    rank: pd.DataFrame = None,
+    *,
+    exit_mode: str = 'state'
 ) -> FinlabDataFrame
 ```
 
@@ -465,6 +469,7 @@ hold_until(
 - `trail_stop_activation` (float, optional, *v2.0.12*): Unrealized-gain threshold the position must reach before `trail_stop` arms. Until this gain is hit, only the static `stop_loss` applies. Useful when you want winners to clear entry noise (e.g. +10 %) before the trail starts ratcheting
 - `trade_at` (str, optional, default='close'): Price reference for stop/take profit ('close' or 'open')
 - `rank` (pd.DataFrame, optional): Ranking DataFrame for prioritizing entries when limit is reached (higher = priority)
+- `exit_mode` (str, keyword-only, default=`'state'`, *v2.2.1*): How dates missing from `exit` are treated. `'state'`: forward-fill `exit`, so a monthly exit condition blocks entries until the next publication. `'event'`: exit only on dates present in `exit`. Any other value raises `ValueError`. With `'state'`, `exit` must be sorted ascending (`exit.sort_index()`), otherwise `ValueError`
 
 **Returns:**
 - Boolean FinlabDataFrame with positions (True indicates holding)
@@ -494,6 +499,35 @@ position = entries.hold_until(
 
 report = sim(position)
 ```
+
+**Sparse exit signals — `exit_mode` matters.** Entries are always events. When `exit` has fewer dates than `entries` (monthly revenue, quarterly reports, weekly conditions), the result depends on `exit_mode`:
+
+| finlab version | Default behavior for missing `exit` dates |
+|---|---|
+| ≤ 2.0.21 | `'state'` (forward-filled) |
+| 2.1.0 – 2.2.0 | `'event'` (no exit), no parameter to change it |
+| ≥ 2.2.1 | `'state'`; pass `exit_mode='event'` to reproduce 2.1.0–2.2.0 results |
+
+```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+rev = data.get('monthly_revenue:當月營收')
+
+entries = close > close.average(20)
+exits = rev < rev.average(3)            # monthly: only has publication dates
+
+# state: the exit condition persists until the next revenue release
+pos_state = entries.hold_until(exits, nstocks_limit=10, rank=-close)
+# event: exit only on the publication date itself
+pos_event = entries.hold_until(exits, nstocks_limit=10, rank=-close, exit_mode='event')
+
+print(pos_state.equals(pos_event))      # False - the two modes hold different stocks
+report = sim(pos_state, upload=False)
+```
+
+`'event'` only sees the dates in the `exit` you pass. If `exit` was already combined with daily data (e.g. `exits | (close < close.average(60))`) or is lazy, it is already forward-filled and both modes give the same result — pass the raw low-frequency condition to get event semantics.
 
 ---
 
