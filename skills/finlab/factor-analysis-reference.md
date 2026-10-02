@@ -199,7 +199,8 @@ Calculate Information Coefficient (IC) for factors. Internally calls calc_metric
 ic(
     factor: pd.DataFrame | Dict[str, pd.DataFrame],
     adj_close: pd.DataFrame,
-    days: list[int] = [10, 20, 60, 120]
+    days: list[int] = [10, 20, 60, 120],
+    method: str = 'pearson'
 ) -> pd.DataFrame
 ```
 
@@ -207,6 +208,7 @@ ic(
 - `factor` (pd.DataFrame or dict, required): Factor data as DataFrame (columns are stock IDs) or dict[str, DataFrame] (keys are factor names)
 - `adj_close` (pd.DataFrame, required): Adjusted closing price DataFrame (columns are stock IDs) for calculating future returns
 - `days` (list[int], optional, default=[10, 20, 60, 120]): Prediction horizon list for calculating d-day future returns
+- `method` (str, optional, default='pearson', *v2.1.0*): `'pearson'` for linear IC, `'spearman'` for rank IC (robust to outliers and monotonic transforms)
 
 **Returns:**
 - `pd.DataFrame`: IC for each factor at different prediction horizons. Column names are <factor>_<days>, indexed by date
@@ -223,6 +225,9 @@ adj_close = data.get('etl:adj_close')
 # Calculate IC (correlation coefficient)
 ic_df = ic(factor, adj_close)
 print(ic_df.head())
+
+# Rank IC (v2.1.0)
+rank_ic_df = ic(factor, adj_close, method='spearman')
 
 # Analyze IC at different horizons
 print(ic_df.mean())
