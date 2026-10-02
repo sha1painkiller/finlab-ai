@@ -14,7 +14,7 @@ Do not tolerate:
 ## Project Structure
 
 ```
-finlab-plugin/skills/finlab/
+skills/finlab/
 ├── SKILL.md                    # Main entry point - overview, quick start, core workflow
 ├── dataframe-reference.md      # FinLabDataFrame methods (is_largest, sustain, hold_until)
 ├── backtesting-reference.md    # sim() API, Report class, metrics extraction
@@ -23,8 +23,7 @@ finlab-plugin/skills/finlab/
 ├── factor-analysis-reference.md # IC, Shapley values, calc_metric, calc_centrality
 ├── best-practices.md           # Patterns, anti-patterns, error handling
 ├── machine-learning-reference.md # feature.combine, label generation, ML workflow
-├── us-market.md                # US market: data map, quarterly alignment, defaults, universe construction
-└── README.md                   # TODO/improvements tracker
+└── us-market.md                # US market: data map, quarterly alignment, defaults, universe construction
 ```
 
 ## Documentation Quality Standards
@@ -185,7 +184,7 @@ When reviewing any skill file, verify:
 
 - Commit messages: `<file>: <what changed>` (e.g., `backtesting-reference.md: Add trail_stop parameter docs`)
 - One logical change per commit
-- Keep README.md TODO list updated
+- Bump `version` in `.claude-plugin/plugin.json` when skill content changes
 
 ### Quality Gates
 
@@ -247,7 +246,6 @@ When user asks to optimize documentation:
 3. Identify specific issues (list them)
 4. Fix issues one at a time
 5. Verify fixes don't break cross-references
-6. Update README.md TODO if needed
 ```
 
 ## Quality Metrics
