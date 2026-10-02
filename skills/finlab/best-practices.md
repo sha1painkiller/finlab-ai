@@ -159,7 +159,7 @@ rev = data.get('monthly_revenue:當月營收')
 sim(position, resample=rev.index)
 ```
 
-**DON'T:** Omit `resample` (defaults to daily, causes excessive trading).
+**DON'T:** Omit `resample` for ranking/factor strategies. With the default `resample=None`, `sim()` rebalances on every date the position changes, so a daily-updated signal (e.g. daily rank) trades daily and overtrades.
 
 ---
 
@@ -185,13 +185,9 @@ condition = (close > 99.9) & (close < 100.1)
 **Reason:** FinLabDataFrame already automatically aligns indices/columns. When monthly or quarterly string-index data is combined with daily data through FinLabDataFrame operators or boolean indexing, internal `reshape()` calls `index_str_to_date()` automatically, then forward-fills on the combined date grid. This applies to both Taiwan data such as `monthly_revenue:*` / `fundamental_features:*` and US data such as `us_income_statement:*` / `us_balance_sheet:*`.
 
 ```python
-# ❌ BAD - unnecessary manual conversion/alignment
+# Automatic PIT alignment
 close = data.get("price:收盤價")
 roe = data.get("fundamental_features:ROE稅後")
-roe_daily = roe.index_str_to_date().reindex(close.index, method='ffill')
-position = (close > close.average(60)) & (roe_daily > 0)
-
-# ✅ GOOD - automatic PIT alignment
 position = (close > close.average(60)) & (roe > 0)
 ```
 
@@ -206,13 +202,7 @@ roe = net_income / equity
 position = (roe > 0.15) & (close > 5)  # reshape() handles filing-date alignment
 ```
 
-**Exception:** Use `.index_str_to_date()` when you explicitly need the dated index object for inspection, date extraction, resampling, or pandas-native operations. Use `reindex()` only for a final position DataFrame when changing to a specific resampling schedule:
-
-```python
-# ✅ Allowed - reindex position to monthly revenue dates
-rev = data.get('monthly_revenue:當月營收')
-position_resampled = position.reindex(rev.index_str_to_date().index, method="ffill")
-```
+Never use `reindex()` or `reindex_like()`, including on final positions. Use `sim(position, resample=...)` for rebalance schedules and `.index_str_to_date()` only to inspect dates.
 
 ### ❌ Don't Use For Loops
 
@@ -285,7 +275,7 @@ selected = latest_pe.loc[common][latest_combined.loc[common]]
 # ✅ GOOD - leave index as-is
 revenue = data.get("monthly_revenue:當月營收")
 # Index may contain strings like "2022-01", "2022-02", etc.
-# FinLabDataFrame aligns by shape in binary operations
+# FinLabDataFrame operators align dates and stock columns automatically
 position = revenue > revenue.shift(1)
 ```
 
@@ -296,39 +286,9 @@ position = revenue > revenue.shift(1)
 df.index = new_index  # NEVER DO THIS
 ```
 
-### ✅ Use Only Approved Resampling Method
+### ✅ Let FinLab Handle Alignment and Rebalancing
 
-**DO:** Use exactly this pattern for resampling (datetime index required, use `.last()` only).
-
-```python
-# ✅ CORRECT resampling pattern
-df = df.index_str_to_date().resample('M').last()
-```
-
-**DON'T:** Use other aggregation methods like `.mean()`, `.first()`, `.ffill()`.
-
-```python
-# ❌ WRONG
-df = df.resample('M').mean()  # Can cause lookahead
-df = df.resample('M').ffill()  # Can cause lookahead
-```
-
-### ✅ Use Only Approved Reindexing Method
-
-**DO:** Use exactly `method='ffill'` for reindexing.
-
-```python
-# ✅ CORRECT
-df = df.reindex(target_index, method='ffill')
-```
-
-**DON'T:** Use other methods like `'bfill'` or `None`.
-
-```python
-# ❌ WRONG
-df = df.reindex(target_index, method='bfill')  # Lookahead bias
-df = df.reindex(target_index)  # Missing data
-```
+Use `sales_to_price = eps_sales / close` directly. Never use `reindex()` or `reindex_like()`, including on final positions. Set schedules through `sim(position, resample="M")` or `sim(position, resample=rev)` for revenue releases. Calculate quarterly `shift(4)` or `rolling(4)` before combining with daily prices. Do not overwrite financial indices, backfill future observations, or bypass alignment through pandas/NumPy. Inspect types and consult the dataframe reference if an operation fails.
 
 ### ✅ Use `verify_strategy()` to Auto-Detect Lookahead Bias
 
@@ -630,11 +590,8 @@ strong_growth = (rev_growth > 20).sustain(3)
 position = rev_high & strong_growth
 position = rev_growth[position].is_largest(10)
 
-# Reindex to monthly revenue dates
-position_resampled = position.reindex(rev.index_str_to_date().index, method="ffill")
-
-# Backtest
-report = sim(position_resampled, upload=False)
+# Rebalance on monthly revenue releases
+report = sim(position, resample=rev, upload=False)
 report.to_html("revenue_growth.html")
 ```
 

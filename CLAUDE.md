@@ -135,7 +135,7 @@ When reviewing any skill file, verify:
 ### SKILL.md (Main Entry)
 - Must contain working quick start example (< 20 lines)
 - Must list all reference files with 1-line descriptions
-- Must include prerequisites (API token, installation)
+- Must include prerequisites (FinLab login, installation)
 - Do NOT duplicate detailed reference content here
 
 ### dataframe-reference.md

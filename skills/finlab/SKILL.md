@@ -39,18 +39,28 @@ compatibility: Requires Python 3.10+ and uv package manager (https://docs.astral
 
    `uv run --with` auto-creates a temporary environment with dependencies — no venv management needed.
 
-   **Prefer zero-install?** Run notebooks directly in [FinLab Studio](https://studio.finlab.finance) — a hosted Jupyter environment with `finlab` preinstalled and your API token already wired up.
+   **Prefer zero-install?** Run notebooks directly in [FinLab Studio](https://studio.finlab.finance) — a hosted Jupyter environment with `finlab` preinstalled and your account already logged in.
 
-3. **API Token is set** (required - finlab will fail without it):
+3. **Logged in to FinLab** (required - data access fails without it):
 
-   **If no token, use finlab's built-in login** (available in >= 1.5.9, improved Firebase flow in v1.5.11):
+   **Desktop (has a browser):** log in once, then just import:
 
-   ```python
-   import finlab
-   finlab.login()  # Opens browser for Google OAuth, saves token automatically
+   ```bash
+   python -m finlab login   # opens the FinLab (Firebase) browser login; credentials are cached locally
    ```
 
-   This handles the full OAuth flow (browser login, token retrieval, `.env` storage) automatically. Tokens are bound to a FinLab account at [finlab.finance](https://finlab.finance) — `finlab.login()` provisions one on first use.
+   ```python
+   import finlab            # cached credentials are picked up automatically
+   finlab.login()           # optional: reuses cached credentials, or starts the browser login if none
+   ```
+
+   `finlab.login()` opens a FinLab browser login (Firebase auth). Without a TTY it prints a login URL that can be opened on any device.
+
+   **Headless / cron / Docker:** on a machine with a browser, log in and run `python -m finlab token --env`, then set the printed `FINLAB_REFRESH_TOKEN`, `FINLAB_SESSION_ID` and `FINLAB_API_KEY` environment variables on the headless machine.
+
+   **Google Colab:** run `finlab.login()` in a cell.
+
+   Do not use `FINLAB_API_TOKEN` or `finlab.login('<api_token>')` — the legacy API-token login is deprecated (`python -m finlab migrate` shows the migration guide).
 
 ## Language
 
@@ -75,14 +85,16 @@ For US-market work — whether single-name equities (`data.set_market('us')`) or
 
 Other-market queries can skip that file.
 
-## API Token Tiers & Usage
+## Account Tiers & Usage
 
-### Token Tiers
+### Tiers
 
-| Tier | Daily Limit | Token Pattern     |
-| ---- | ----------- | ----------------- |
-| Free | 500 MB      | ends with `#free` |
-| VIP  | 5000 MB     | no suffix         |
+| Tier | Daily Limit |
+| ---- | ----------- |
+| Free | 500 MB      |
+| VIP  | 5000 MB     |
+
+Check the current plan and quota with `python -m finlab status`.
 
 
 ### Usage Reset
@@ -377,6 +389,10 @@ Short version pointers for features added in recent releases. Each reference fil
 - `report.to_terminal()`: ASCII report for non-Jupyter runs
 - Overall strategy execution 3.4x faster
 
+## Financial Data Alignment
+
+Never use `reindex()` or `reindex_like()`, including on final positions. FinLabDataFrame automatically reshapes dates and stock columns during arithmetic, comparisons and boolean operations: `sales_to_price = eps_sales / close`. Do not manually align or bypass this behavior with pandas/NumPy. Calculate quarterly shifts and rolling windows before combining with daily data; set rebalance schedules with `sim(position, resample=...)`. Use `index_str_to_date()` only to inspect dates. On errors, inspect types and consult [dataframe-reference.md](dataframe-reference.md).
+
 ## Prevent Lookahead Bias
 
 **Critical:** Avoid using future data to make past decisions:
@@ -389,7 +405,7 @@ prev_close = close.shift(1)
 # prev_close = close.iloc[-2]  # WRONG
 
 # ✅ GOOD: Leave index as-is even with strings like "2025Q1"
-# FinLabDataFrame aligns by shape automatically
+# FinLabDataFrame operators align dates and stock columns automatically
 
 # ❌ BAD: Don't manually assign to df.index
 # df.index = new_index  # FORBIDDEN
@@ -421,4 +437,4 @@ Direct users to open an issue on GitHub: https://github.com/koreal6803/finlab-ai
 
 - Some data columns use Chinese names — this is expected, use them as-is in `data.get()` calls
 - Data frequency varies: daily (price), monthly (revenue), quarterly (financial statements)
-- Always use `sim(..., upload=False)` for experiments, `upload=True` only for final production strategies
+- `sim()` defaults to `upload=None`: local runs do not upload; FinLab Studio / cloud schedules (which set `FINLAB_STRATEGY_NAME` / `FINLAB_FORCED_STRATEGY_NAME`) do. Pass `upload=False` to guarantee no upload, `upload=True` to force one

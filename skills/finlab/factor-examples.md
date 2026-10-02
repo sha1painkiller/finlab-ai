@@ -207,9 +207,9 @@ rev_rise_nsatisfy = 去年同月增減.rank(pct=True, axis=1)
 ### Special Calculations
 
 ```python
-# Align position to monthly revenue dates
+# Rebalance on monthly revenue releases through the backtest API
 rev = data.get("monthly_revenue:當月營收")
-position = position.reindex(rev.index_str_to_date().index, method="ffill")
+report = sim(position, resample=rev, upload=False)
 
 # Replace infinity with NaN
 inf_ratio = (data.get("financial_statement:研究發展費") /
@@ -568,7 +568,6 @@ def vix_position(short_par=5, long_par=20):
     close = data.get("price:收盤價")
     cond = ~close.isna()
     cond1 = short_vix_ma <= long_vix_ma
-    cond1 = cond1.reindex(close.index)
     position = cond & cond1
     return position
 
@@ -670,9 +669,9 @@ cond2 = vol_avg > 300
 cond_all = cond1 & cond2
 
 result = rev_rf * (cond_all)
-position = result[result > 0].is_largest(10).reindex(rev.index_str_to_date().index, method="ffill")
+position = result[result > 0].is_largest(10)
 
-sim(position=position, stop_loss=0.3, position_limit=0.1)
+sim(position=position, resample=rev, stop_loss=0.3, position_limit=0.1)
 ```
 
 ---
@@ -715,9 +714,9 @@ cond2 = rev / rev.shift(1) > 0.9
 cond_all = cond1 & cond2
 
 result = peg * (cond_all)
-position = result[result > 0].is_smallest(10).reindex(rev.index_str_to_date().index, method="ffill")
+position = result[result > 0].is_smallest(10)
 
-sim(position=position, name="peg_rev", fee_ratio=1.425/1000/3, stop_loss=0.1)
+sim(position=position, resample=rev, name="peg_rev", fee_ratio=1.425/1000/3, stop_loss=0.1)
 ```
 
 ---

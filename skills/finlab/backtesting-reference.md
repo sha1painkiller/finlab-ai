@@ -23,8 +23,8 @@ sim(
     resample_offset: Union[str, None] = None,
     trade_at_price: Union[str, pd.DataFrame] = 'close',
     position_limit: float = 1,
-    fee_ratio: float = 1.425/1000,
-    tax_ratio: float = 3/1000,
+    fee_ratio: Union[float, None] = None,   # None -> market default (TW: 1.425/1000)
+    tax_ratio: Union[float, None] = None,   # None -> market default (TW: 3/1000)
     name: str = '未命名',
     stop_loss: Union[float, None] = None,
     take_profit: Union[float, None] = None,
@@ -37,11 +37,12 @@ sim(
     mae_mfe_window: int = 0,
     mae_mfe_window_step: int = 1,
     market: Union[None, Market] = None,
-    upload: bool = True,
-    fast_mode: bool = False,
+    upload: Union[bool, None] = None,
+    *,
+    metrics_only: bool = False,
     notification_enable: bool = False,
     line_access_token: str = ''
-) -> report.Report
+) -> Union[report.Report, Metrics]   # Metrics when metrics_only=True
 ```
 
 ### Parameters
@@ -54,7 +55,7 @@ sim(
 #### resample
 - **Type:** `Union[str, None]`
 - **Default:** `None`
-- **Description:** Trading frequency or rebalancing dates specification. It can be a string (e.g., 'D', 'W', 'M'), a DataFrame, Series, or None. When None, rebalancing only occurs on changes in the position.
+- **Description:** Trading frequency or rebalancing dates specification. It can be a string (e.g., 'D', 'W', 'M'), a DataFrame, Series, or None. When None, rebalancing only occurs on dates where the position changes (it does not rebalance daily).
 
 #### resample_offset
 - **Type:** `Union[str, None]`
@@ -72,13 +73,13 @@ sim(
 - **Description:** Limit for the maximum weight assigned to any single asset (e.g., 0.2 for 20%).
 
 #### fee_ratio
-- **Type:** `float`
-- **Default:** Market-specific *(v1.5.9)* — TW: `1.425/1000`, US: resolved from the active `Market` subclass
+- **Type:** `Union[float, None]`
+- **Default:** `None` → market-specific *(v1.5.9)* — TW: `1.425/1000`, US: resolved from the active `Market` subclass
 - **Description:** Commission fee ratio applied during trades. When not explicitly provided, `sim()` consults the target `Market` for its default instead of hardcoding TW-market values, so US/CB backtests use the correct fee schedule automatically.
 
 #### tax_ratio
-- **Type:** `float`
-- **Default:** Market-specific *(v1.5.9)* — TW: `3/1000`, US: `0`
+- **Type:** `Union[float, None]`
+- **Default:** `None` → market-specific *(v1.5.9)* — TW: `3/1000`, US: `0`
 - **Description:** Transaction tax ratio applied when selling stocks. Resolved from the active `Market` when omitted.
 
 #### name
@@ -132,9 +133,14 @@ sim(
 - **Description:** Step interval for the MAE/MFE analysis.
 
 #### upload
-- **Type:** `bool`
-- **Default:** `True`
-- **Description:** Determines whether to upload the strategy performance report after simulation.
+- **Type:** `Union[bool, None]`
+- **Default:** `None`
+- **Description:** Whether to upload the strategy performance report after simulation. With `None` (default), the report is uploaded only when the environment variable `FINLAB_STRATEGY_NAME` or `FINLAB_FORCED_STRATEGY_NAME` is set (FinLab Studio and cloud schedules set them), so a plain local run does not upload. `upload=True` forces an upload; `upload=False` never uploads.
+
+#### metrics_only
+- **Type:** `bool` (keyword-only)
+- **Default:** `False`
+- **Description:** Return a `Metrics` object (same type as `report.metrics`) without constructing a full `Report`. Faster for parameter sweeps; return-series metrics such as CAGR, Sharpe ratio and max drawdown remain available.
 
 ### Returns
 
@@ -359,7 +365,7 @@ Create factors or indicators that will be used in your strategy.
 **Important Notes:**
 - Do not use `==` for floating point comparisons. Use `np.isclose()` instead
 - Be cautious with `&` and `|` operators; ensure proper parentheses to avoid precedence issues
-- Prevent using reindex to align FinlabDataFrame as it already has aligned indices and columns
+- Never use `reindex()` or `reindex_like()`, including on final positions; use `sim(position, resample=...)` for schedules. FinlabDataFrame arithmetic, comparisons and boolean indexing automatically align dates and stock columns, including quarterly financial statements versus daily prices. For example, use `sales_to_price = eps_sales / close` directly.
 - Do not use for loops to iterate over rows or columns. Use vectorized operations instead
 
 **Example:**
