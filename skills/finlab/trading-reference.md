@@ -121,6 +121,28 @@ total_position = position1 + position2
 
 ---
 
+## Pre-Open Data Checks *(v2.1.0)*
+
+Before generating orders, confirm the trading calendar and data freshness:
+
+```python
+import datetime as dt
+from finlab import data
+
+cal = data.get_calendar('tw')               # announced TW sessions incl. future holidays; no login or quota
+today = dt.date.today()
+print(cal.is_session(today), cal.next_session(today), cal.previous_session(today))
+
+close = data.get('price:收盤價')             # readiness() checks datasets loaded in this process
+status = data.readiness()                   # are they current for the next open?
+if not status['final_ready']:
+    print('data not ready:', status.get('reason'), status['datasets'])
+```
+
+`get_calendar()` raises `CalendarUnavailable` for unannounced years instead of guessing weekdays. `readiness()` returns `final_ready=False` for unknown evidence, unsupported markets, stale calendars, no loaded data (`reason='no_loaded_data'`), or reads restricted by `start`/`end` (`reason='historical_data_selection'`). The checks follow scheduled publication times, which are not guaranteed delivery deadlines.
+
+---
+
 ## Broker Account Setup
 
 ### Environment Variables Summary
