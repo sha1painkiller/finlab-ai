@@ -124,7 +124,42 @@ with data.universe(market='TSE_OTC', category=['水泥工業']):
 # Method 2: Set globally
 data.set_universe(market='TSE_OTC', category='半導體', exclude_category='金融')
 price = data.get('price:收盤價')
+
+# Undo a global universe (v2.1.0); set_universe() with no filters does the same
+data.reset_universe()
 ```
+
+**Point-in-time listing eligibility** *(v2.1.0)*: `data.universe` filters by the *current* catalog. To mask stocks that were not listed on each date, use `universe.membership(market)` (`'TSE'`, `'OTC'`, `'TSE_OTC'`). It returns a daily boolean frame; apply it before each cross-sectional ranking:
+
+```python
+from finlab import data
+from finlab.data import universe
+
+close = data.get('price:收盤價')
+eligible = universe.membership('TSE_OTC')
+position = close.pct_change(20)[eligible].is_largest(20)
+```
+
+Eligibility is reconstructed from current listing records, not a historical vintage. Securities with incomplete listing history stay `False` for the unverified periods; `membership()` warns and lists them in `eligible.attrs['membership_missing_history']`.
+
+### ✅ Narrow Reads with `data.get()` Keyword Options
+
+| Option | Since | Effect |
+|---|---|---|
+| `start=`, `end=` | v2.0.19 | Inclusive bounds on the `date` index, applied at read time (`ValueError` if the dataset has no `date`) |
+| `as_of=` | v2.2.0 | The dataset exactly as published at that time (naive values are Asia/Taipei). Paid plan; counts toward quota |
+| `version=` | v2.2.0 | A specific `generation` from `data.versions(dataset)`; mutually exclusive with `as_of` |
+
+```python
+from finlab import data
+
+q1 = data.get('price:收盤價', start='2024-01-01', end='2024-03-31')
+
+versions = data.versions('price:收盤價')   # generation, time_created, time_replaced (UTC), size, hash
+oldest = data.get('price:收盤價', as_of=versions['time_created'].iloc[0])
+```
+
+Only versions the server still retains are listed. Intraday bars *(v2.0.20)*: `data.get('tw_minute:2330', start=..., end=...)` and `tw_tick:<symbol>` return long-form after-market frames and require both dates (at most 31 calendar days).
 
 Use `data.search('keyword', market='<market>')` to discover available datasets and `data.universe()` parameters. It returns a `pd.Series` of dataset names *(v2.0.16; a `list` before that)*. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `'營收'` for `tw`, `'revenue'` for `us`).
 
@@ -396,7 +431,10 @@ sim(position, resample="M")
 
 ```python
 sim(position.loc['2020':'2023'], resample="M")
+sim(position.loc['2020':], resample="M", end_date='2023-12-31')  # v2.1.0: explicit cutoff
 ```
+
+Without `end_date`, `sim()` infers where a sliced backtest ends from the signal spacing. `end_date` makes the cutoff explicit: prices after it are dropped before the simulation, so no bar past `end_date` is ever used.
 
 ### Pattern 3: Optuna Parameter Optimization
 
