@@ -141,7 +141,7 @@ sim(
 #### end_date
 - **Type:** `Union[str, datetime.date, pd.Timestamp, None]` (keyword-only)
 - **Default:** `None`
-- **Description:** Inclusive cutoff for the backtest. Position rows and trade prices after `end_date` are dropped, and open trades are valued at the last bar on or before it. A bare date (e.g. `'2023-12-31'`) covers that whole day. Raises `ValueError` if `end_date` is earlier than the first position date. *(not in 2.0.21; present in 2.1.1)*
+- **Description:** Inclusive cutoff for the backtest. Position rows and trade prices after `end_date` are dropped, and open trades are valued at the last bar on or before it. A bare date (e.g. `'2023-12-31'`) covers that whole day. Raises `ValueError` if `end_date` is earlier than the first position date. *(v2.1.0)*
 
 ```python
 report = sim(position, resample="M", end_date="2023-12-31", upload=False)
@@ -156,6 +156,28 @@ print(report.creturn.index[-1])  # last trading bar <= 2023-12-31
 ### Returns
 
 An instance of `Report` containing performance metrics, trades, and additional analyses.
+
+### Delisted Holdings *(v2.1.0)*
+
+`sim()` sells a held asset once it can no longer trade. Before 2.1.0 the engine froze its value at the last price, re-bought it at every rebalance and reported its trades with a NaN return, so **results for strategies holding delisted stocks differ from pre-2.1.0 runs**.
+
+- **Sale bar:** with an exchange delisting notice (`market.get_delisting_notices()`; TW reads `delisting_announcements`), the first priced bar after the announcement. Without a notice, the last priced bar, if prices stop at least 20 bars before the end of the data (a shorter gap may be a trading halt).
+- **Cash:** with `resample=None` the portfolio rebalances on the sale day. Otherwise the cash waits for the next rebalance.
+- **Warning:** `finlab.backtest.delisting.DelistedHoldingWarning` lists each affected symbol and its sale date (`None` when the sale falls after the data).
+
+```python
+import warnings
+from finlab import data
+from finlab.backtest import sim
+from finlab.backtest.delisting import DelistedHoldingWarning
+
+close = data.get('price:收盤價')
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter('always', DelistedHoldingWarning)
+    report = sim(close.is_largest(10), resample='M', upload=False)
+delisted = [w.message for w in caught if issubclass(w.category, DelistedHoldingWarning)]
+print(delisted[0] if delisted else 'no delisted holdings')
+```
 
 ---
 
@@ -485,6 +507,11 @@ from finlab.exceptions import (
     AuthError,        # login / token refresh
     PortfolioError,   # PortfolioSyncManager sync failures
     ConfigError,      # invalid configuration
+)
+from finlab.exceptions import (
+    DatasetNotFoundError,  # (v2.1.0) DataError; data.get() on an unknown key; .suggestions holds close matches
+    LoginError,            # (v2.1.0) AuthError; finlab.login() browser login failed or timed out
+    SignedDownloadError,   # (v2.2.1) DataError; signed data-URL download failed; .dataset, .status
 )
 
 try:
