@@ -333,6 +333,29 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 
 Short version pointers for features added in recent releases. Each reference file tags the exact API with `(vX.Y.Z)`.
 
+**v2.2.1** (2026-09-30)
+- `hold_until(..., exit_mode='state'|'event')`: **default restored to `'state'`** (sparse exit signals forward-fill, as in ≤ 2.0.21). 2.1.0–2.2.0 behaved as `'event'`; pass `exit_mode='event'` to reproduce those results — see [dataframe-reference.md](dataframe-reference.md)
+- `finlab.exceptions.SignedDownloadError` family for data-download failures (subclass of `DataError`)
+
+**v2.2.0** (2026-09-27)
+- `data.get(..., as_of=..., version=...)` + `data.versions(dataset)`: read a dataset exactly as it was published (paid plan) — see [best-practices.md](best-practices.md)
+
+**v2.1.0** (2026-09-24)
+- `sim()` **behavior change**: delisted holdings are sold on the first bar after the delisting notice instead of being frozen and re-bought; emits `DelistedHoldingWarning`. Results for affected strategies differ from 2.0.x — see [backtesting-reference.md](backtesting-reference.md)
+- `hold_until()` **behavior change**: dates missing from a sparse `exit` no longer forward-fill (reverted in 2.2.1)
+- `sim(..., end_date=...)`: keyword-only inclusive backtest cutoff — see [backtesting-reference.md](backtesting-reference.md)
+- `ic(..., method='spearman')`: rank IC — see [factor-analysis-reference.md](factor-analysis-reference.md)
+- `universe.membership(market)`: point-in-time listing eligibility mask; `data.reset_universe()` — see [best-practices.md](best-practices.md)
+- `data.get_calendar('tw')` / `data.readiness()`: trading-calendar and data-freshness checks before the open — see [trading-reference.md](trading-reference.md)
+- `is_largest` / `is_smallest` emit `TopNPaddingWarning` when tied floor values (e.g. `score * cond` zeros) fill the top N; `pd_df <op> finlab_df` with differing dates or stocks emits `PandasLeftOperandWarning` — put the FinlabDataFrame on the left
+- `DatasetNotFoundError` (with `.suggestions`) for unknown dataset keys; `finlab.login()` raises `LoginError` instead of failing silently
+
+**v2.0.20** (2026-09-18)
+- Intraday bars: `data.get('tw_minute:<symbol>' | 'tw_tick:<symbol>', start=..., end=...)` (both dates required, ≤ 31 days)
+
+**v2.0.19** (2026-09-16)
+- `data.get(..., start=..., end=...)`: inclusive date bounds applied at read time
+
 **v2.0.18** (2026-08-19)
 - `df.rank(axis=1)` **behavior fix**: the cross-sectional fast path previously assigned ordinal ranks (`method="first"`), disagreeing with the documented default `method="average"` — tied cells got distinct percentiles. Ties now share one percentile. Affects discrete / low-cardinality factors; re-check thresholds tuned before 2.0.18 — see [dataframe-reference.md](dataframe-reference.md)
 - `SinopacAccount`: contract lookup now uses shioaji >= 1.7's on-demand `api.contracts` accessor, with the legacy `fetch_contracts` path kept only for shioaji < 1.7 — see [trading-reference.md](trading-reference.md)
