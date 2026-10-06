@@ -8,6 +8,7 @@ This reference covers the complete workflow for executing trades from backtest r
 2. **Broker Connection**: Configure and connect to your broker account
 3. **Order Execution**: Create, update, and manage orders via OrderExecutor
 4. **Realtime Sync** *(v2.0.0)*: Subscribe to live position/fill streams via `PositionStreamMixin`
+5. **Review** *(v2.2.4)*: Rebuild actual NAV and trades from fills via `TradeReview`
 
 ---
 
@@ -414,6 +415,76 @@ print(acc.get_position())
 
 ---
 
+## Real-Trade Review — `TradeReview` *(v2.2.4)*
+
+`finlab.portfolio.TradeReview` rebuilds daily holdings, cash, NAV, time-weighted returns, FIFO trades and a FinLab `Report` from **actual fills**, so you can compare live results against the backtest.
+
+**Signature:**
+```python
+TradeReview(
+    fills: pd.DataFrame,                 # time, stock_id, action, quantity (shares), price; optional fee, tax (NTD amounts)
+    prices: pd.DataFrame,                # UNADJUSTED close, dates x stock IDs, for daily valuation
+    *,
+    start=None,                          # default: first fill day
+    end=None,                            # default: last price date
+    initial_holdings: dict[str, float] | None = None,  # shares held before start
+    initial_cash: float | None = None,   # account mode; None = holdings mode (see below)
+    cash_events: pd.DataFrame | None = None,         # time, amount (+ = in), type ('deposit'/'withdrawal' = external flow; others = P&L)
+    corporate_actions: pd.DataFrame | None = None,   # stock_id, date, cash (per share), ratio (share multiplier)
+    market: Market | None = None,
+    limitations: list[str] = (),
+)
+TradeReview.from_account(account, start, *, prices=None, initial_cash=None,
+                         cash_events=None, corporate_actions='auto', fee_ratio=None, **broker_kwargs)
+```
+
+**Example (fills you already have):**
+```python
+import pandas as pd
+from finlab import data
+from finlab.portfolio import TradeReview
+
+fills = pd.DataFrame({
+    'time':     ['2026-07-01 09:05', '2026-07-01 09:10', '2026-08-03 13:20'],
+    'stock_id': ['2330', '2317', '2330'],
+    'action':   ['buy', 'buy', 'sell'],     # also 'B'/'S', Action.BUY
+    'quantity': [1000, 2000, 500],          # shares, not lots
+    'price':    [1105.0, 230.5, 1180.0],
+    'fee':      [1574, 656, 840],           # actual NTD amounts, not rates
+    'tax':      [0, 0, 1770],
+})
+review = TradeReview(
+    fills,
+    prices=data.get('price:收盤價'),
+    initial_cash=2_000_000,
+    cash_events=pd.DataFrame({'time': ['2026-08-15'], 'amount': [500_000], 'type': ['deposit']}),
+)
+print(review.summary())          # base_nav, end_nav, net_inflow, income, fees_and_tax, pnl, time_weighted_return
+review.report.to_html('trade_review.html')
+
+target = pd.DataFrame({'2330': [1000], '2317': [2000]}, index=pd.to_datetime(['2026-08-31']))
+print(review.compare(target, kind='shares'))   # date, stock_id, target, actual, diff
+```
+
+**From a logged-in broker account:** `TradeReview.from_account(SinopacAccount(), start='2026-01-01')` fetches fills and works backward from current broker holdings to the starting holdings. Supported: `SinopacAccount`, `PocketAccount`, `FubonAccount`, `MasterlinkAccount`, `FugleAccount`, `SchwabAccount`, `BinanceAccount`. Other accounts raise `NotImplementedError`; use the constructor instead. For TW accounts, `corporate_actions='auto'` loads ex-dividend and split data from FinLab. The constructor applies no corporate actions unless you pass them.
+
+| Mode | When | NAV and flows |
+|---|---|---|
+| Account (`initial_cash` given) | Broker reports cash, deposits and withdrawals | NAV = cash + market value. Only `deposit`/`withdrawal` count as external flows. |
+| Holdings (`initial_cash=None`) | TW settlement accounts with no cash history | Buy amounts count as invested before the open. Sale proceeds and dividends count as withdrawn after the close. |
+
+| Output | Contents |
+|---|---|
+| `review.daily` | `cash`, `market_value`, `nav`, `inflow`, `outflow`, `income`, `fees_and_tax`, `return`, `pnl` |
+| `review.holdings` / `review.weights` | Daily shares / NAV weights per stock |
+| `review.trades` | FIFO-matched trades; open lots have `exit_date = NaT` |
+| `review.returns` / `review.creturn` | Time-weighted daily / cumulative returns |
+| `review.limitations` | Data gaps found, e.g. rebuilt holdings that disagree with the broker |
+
+`review.report` raises `ValueError` if any held stock lacks a closing price. Check `review.limitations` first.
+
+---
+
 ## PortfolioSyncManager — Typed Data APIs
 
 *(v1.5.9)* In addition to `to_file()` / `from_file()` / `to_cloud()` / `from_cloud()`, `PortfolioSyncManager` now exposes typed data access:
@@ -434,6 +505,8 @@ pm.set_data_typed(data)
 ```
 
 The typed pair validates the payload against the `PortfolioData` schema at the boundary, so schema regressions surface immediately instead of propagating into persisted state.
+
+**Budget check** *(v2.2.2)*: `pm.update(...)` raises `finlab.exceptions.PortfolioError` when it rebuilds a positive-weight strategy and `total_balance` minus the market value of holdings in strategies not being updated is ≤ 0. The whole update aborts. No config or history is written, no positions are removed or rebuilt, and no strategy's stop-loss/take-profit is processed. Raise `total_balance` above the lower bound quoted in the error and rerun `update()`.
 
 ---
 
