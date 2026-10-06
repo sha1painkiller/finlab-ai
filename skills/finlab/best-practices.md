@@ -89,6 +89,20 @@ upperband, middleband, lowerband = data.indicator(
 rsi = data.indicator("RSI", close, timeperiod=14)  # ERROR
 ```
 
+**Keyword validation** *(v2.2.2)*: TA-Lib keywords the indicator does not accept raise `ValueError` instead of being silently ignored. Before 2.2.2, a typo such as `timperiod=14` ran with the defaults.
+
+```python
+from finlab import data
+
+data.indicator("RSI", timperiod=14)    # ValueError: ... its parameters are: timeperiod.
+data.indicator("RSI", adjusted=True)   # ValueError: ... Use `adjust_price=True` ...
+
+rsi = data.indicator("RSI", adjust_price=True, timeperiod=14)  # adjusted prices
+rsi = data.indicator("RSI", strict=True, timeperiod=14)        # v2.2.4: also rejects input selectors like price='open'
+```
+
+`strict=True` is TA-Lib only; with pandas_ta it raises `NotImplementedError`.
+
 ### ✅ Use `df.shift(1)` for Previous Values
 
 **DO:** Use `.shift()` to access historical data.
@@ -127,7 +141,13 @@ price = data.get('price:收盤價')
 
 # Undo a global universe (v2.1.0); set_universe() with no filters does the same
 data.reset_universe()
+
+# Method 3: Explicit stock list (v2.2.3); combined with other filters it intersects
+with data.universe(whitelist=['2330', '2317', '2454']):
+    price = data.get('price:收盤價')   # columns: 2317, 2330, 2454
 ```
+
+`whitelist` alone bypasses the market catalog, so delisted IDs are kept. It is a static set: it does not encode when each stock was listed.
 
 **Point-in-time listing eligibility** *(v2.1.0)*: `data.universe` filters by the *current* catalog. To mask stocks that were not listed on each date, use `universe.membership(market)` (`'TSE'`, `'OTC'`, `'TSE_OTC'`). It returns a daily boolean frame; apply it before each cross-sectional ranking:
 
@@ -162,6 +182,18 @@ oldest = data.get('price:收盤價', as_of=versions['time_created'].iloc[0])
 Only versions the server still retains are listed. Intraday bars *(v2.0.20)*: `data.get('tw_minute:2330', start=..., end=...)` and `tw_tick:<symbol>` return long-form after-market frames and require both dates (at most 31 calendar days).
 
 Use `data.search('keyword', market='<market>')` to discover available datasets and `data.universe()` parameters. It returns a `pd.Series` of dataset names *(v2.0.16; a `list` before that)*. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `'營收'` for `tw`, `'revenue'` for `us`).
+
+Check access and metadata before downloading:
+
+```python
+from finlab import data
+
+data.search('收盤價', details=True)  # v2.2.3: DataFrame of dataset, auth ('free'/'vip'), free_until
+info = data.describe('price:收盤價')  # v2.2.5: no download
+print(info['category_description'], info['layout'], info['schedule'], info['columns'])
+```
+
+`describe()` raises `KeyError` for unknown keys. Its `index_end` is the catalog's last index label (possibly a future period label), not the latest observation date.
 
 ### ✅ Always Write `report.to_html()` After `sim()`
 
@@ -507,12 +539,18 @@ sim(position, resample="Q", resample_offset="1M")
 
 ### Error: `_ArrayMemoryError`
 
-**Solution:** Reset kernel and try again.
+**Solution:** Release FinLab's in-memory data cache *(v2.2.5)*, drop your own large frames, and narrow the next read. If memory is still exhausted, restart the Python kernel.
 
 ```python
-# Call this if you encounter _ArrayMemoryError
-resetKernel()
+from finlab import data
+
+data.free_memory()   # clears RAM caches; disk cache and settings are kept
+data.truncate_start = '2018-01-01'
+with data.universe(market='TSE_OTC'):
+    close = data.get('price:收盤價')
 ```
+
+`free_memory()` cannot release DataFrames you still reference, and `CacheStorage` data has to be downloaded again. To limit parallel downloads, set `FINLAB_MAX_DOWNLOAD_WORKERS` *(v2.2.5, default 8)*.
 
 ### Error: `requests.exceptions.ConnectionError`
 
