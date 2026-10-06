@@ -141,7 +141,7 @@ sim(
 #### end_date
 - **Type:** `Union[str, datetime.date, pd.Timestamp, None]` (keyword-only)
 - **Default:** `None`
-- **Description:** Inclusive cutoff for the backtest. Position rows and trade prices after `end_date` are dropped, and open trades are valued at the last bar on or before it. A bare date (e.g. `'2023-12-31'`) covers that whole day. Raises `ValueError` if `end_date` is earlier than the first position date. *(v2.1.0)*
+- **Description:** Inclusive cutoff for positions, prices and the report (`creturn`, `trades`, stats). Position rows and trade prices after `end_date` are dropped; open trades are valued at the last bar on or before it and stay open in `report.trades`. A bare date (e.g. `'2023-12-31'`) covers that whole day. `None` infers the end from signal spacing. Raises `ValueError` if `end_date` is earlier than the first position date. *(v2.1.0)*
 
 ```python
 report = sim(position, resample="M", end_date="2023-12-31", upload=False)

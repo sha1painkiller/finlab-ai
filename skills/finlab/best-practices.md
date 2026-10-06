@@ -429,9 +429,10 @@ sim(position, resample="M")
 
 ### Pattern 2: Backtest Within Date Range
 
+See [end_date](backtesting-reference.md#end_date) for the inclusive cutoff.
+
 ```python
-sim(position.loc['2020':'2023'], resample="M")
-sim(position.loc['2020':], resample="M", end_date='2023-12-31')  # v2.1.0: explicit cutoff
+sim(position.loc['2020':], resample="M", end_date='2023-12-31')
 ```
 
 Without `end_date`, `sim()` infers where a sliced backtest ends from the signal spacing. `end_date` makes the cutoff explicit: prices after it are dropped before the simulation, so no bar past `end_date` is ever used.
