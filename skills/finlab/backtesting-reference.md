@@ -179,6 +179,65 @@ delisted = [w.message for w in caught if issubclass(w.category, DelistedHoldingW
 print(delisted[0] if delisted else 'no delisted holdings')
 ```
 
+### Stop Exits and Live Targets *(v2.2.3, v2.2.5)*
+
+**Behavior changes** after a `stop_loss` / `take_profit` / `trail_stop` exit:
+- *(v2.2.3)* `report.next_weights` and `Position.from_report()` follow the engine's allocation to the remaining holdings at the next rebalance. Before 2.2.3, live targets could differ from the backtest.
+- *(v2.2.3)* With `resample=None`, stopped-out stocks no longer re-enter the position. Live targets for bool/float positions change accordingly.
+- *(v2.2.5)* Remaining shorts keep their original weights instead of being enlarged: with five shorts at `-0.2` and one stopped out, the other four stay at `-0.2` (previously `-0.25`).
+
+### Taiwan Single-Stock Futures *(v2.2.3)*
+
+`TWStockFuturesMarket` sends `sim()` to a separate engine that trades whole futures lots and tracks P&L, fees, tax and margin in NTD. This first-stage engine uses **adjusted underlying stock prices** as futures prices. It does not model basis, expiry, roll, contract adjustments, margin calls or forced liquidation.
+
+**Signature:**
+```python
+from finlab.markets.tw_stock_futures import TWStockFuturesMarket
+
+TWStockFuturesMarket(
+    *,
+    contract: Literal['standard', 'mini'] = 'standard',   # 2,000 / 100 shares per lot
+    initial_capital: float = 1_000_000,                   # NTD
+    leverage: float = 1,                                  # gross notional / equity at rebalances
+    fee_per_lot: float | None = None,                     # REQUIRED: NTD per lot per side
+    tax_ratio: float = 2e-5,                              # on notional, both sides
+    margin_ratio: float | Mapping[str, float] = 0.135,    # assumed initial margin / notional
+)
+```
+
+**Example:**
+```python
+from finlab import data
+from finlab.backtest import sim
+from finlab.markets.tw_stock_futures import TWStockFuturesMarket
+
+eligible = ['2330', '2317', '2454', '2303', '2882']  # you must check these have listed stock futures
+adj_close = data.get('etl:adj_close')[eligible].ffill()  # one missing day would otherwise raise ValueError
+position = adj_close.pct_change(20).is_largest(3).loc['2022':]
+
+market = TWStockFuturesMarket(contract='mini', initial_capital=2_000_000, leverage=1.5, fee_per_lot=20)
+report = sim(position, resample='M', trade_at_price=adj_close, market=market, upload=False)
+print(f"CAGR: {report.get_stats()['cagr']:.2%}")
+print(report.lot_positions.iloc[-1])   # lots held
+```
+
+**Constraints:**
+- Every selected stock needs a finite, positive price on every bar from the first signal onward; otherwise `sim()` raises `ValueError`. Pass a forward-filled `trade_at_price` DataFrame, or drop those stocks.
+- Stock IDs do not imply futures eligibility. Choose the stocks yourself.
+- `trade_at_price` must be `'close'` or a daily adjusted price DataFrame. `resample` must be `None` or a string.
+- Not supported (they raise `ValueError`): `stop_loss`, `take_profit`, `trail_stop`, `trail_stop_activation`, `touched_exit`, `retain_cost_when_rebalance`, `stop_trading_next_period`, `mae_mfe_window`, `fee_ratio`, `tax_ratio`, `upload=True`. `report.upload()` and live execution via `Position.from_report()` are also unavailable.
+
+**`FuturesReport` extra attributes:**
+
+| Attribute | Contents |
+|---|---|
+| `report.account` | Daily `equity`, `pnl`, `fee`, `tax`, `margin`, `free_equity`, `gross_notional`, `margin_excess` (NTD) |
+| `report.lot_positions` | Daily integer lots per stock |
+| `report.transactions` | `date`, `signal_date`, `symbol`, `lots`, `price`, `notional`, `fee`, `tax` |
+| `report.trades` | FIFO closed lots plus marked-to-market open lots |
+
+`FuturesSimulationWarning` is raised when a target allocation cannot be funded in whole lots, or when held margin exceeds equity. Return statistics are unavailable once equity reaches ≤ 0.
+
 ---
 
 ## Report Class Reference
