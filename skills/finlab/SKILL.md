@@ -339,6 +339,31 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 
 Short version pointers for features added in recent releases. Each reference file tags the exact API with `(vX.Y.Z)`.
 
+**v2.2.6** (2026-10-05)
+- Default data cache falls back to the system temp directory on Cloud Run, Cloud Functions and AWS Lambda, or whenever the home cache is not writable
+
+**v2.2.5** (2026-10-05)
+- `data.describe(key)`: dataset metadata without downloading; `data.free_memory()`; `FINLAB_MAX_DOWNLOAD_WORKERS` (default 8) — see [best-practices.md](best-practices.md)
+- `data.get()` / `data.gets()` pick up upstream data corrections within ~5 minutes without `force_download=True`
+- **Behavior change**: remaining shorts keep their weights after a stop exit — see [backtesting-reference.md](backtesting-reference.md)
+- `python -m finlab ai --history [N]`, `--show <ID>` and `--json`
+
+**v2.2.4** (2026-10-04)
+- `finlab.portfolio.TradeReview`: rebuild actual NAV, holdings and trades from real fills — see [trading-reference.md](trading-reference.md)
+- `data.indicator(..., strict=True)` — see [best-practices.md](best-practices.md)
+
+**v2.2.3** (2026-10-04)
+- `TWStockFuturesMarket`: single-stock futures backtests in integer lots (NTD fees, tax, margin) — see [backtesting-reference.md](backtesting-reference.md)
+- **Behavior change**: after stop exits, `report.next_weights` / `Position.from_report()` follow the backtest allocation; with `resample=None` stopped stocks no longer re-enter — see [backtesting-reference.md](backtesting-reference.md)
+- `data.universe(whitelist=[...])`; `data.search(..., details=True)` shows `auth` / `free_until` — see [best-practices.md](best-practices.md)
+- English aliases for TW OHLCV keys: `data.get('price:close')` = `data.get('price:收盤價')` (also `open`, `volume`)
+- 1-minute futures bars: `data.get('tw_futures_minute:TX_202610', start=..., end=...)` (both dates required)
+- `python -m finlab ai "question"`: FinLab AI assistant in the terminal (shares history and quota with studio.finlab.finance)
+
+**v2.2.2** (2026-10-03)
+- **Behavior change**: `data.indicator()` raises `ValueError` on keywords the TA-Lib indicator does not accept (previously ignored silently) — see [best-practices.md](best-practices.md)
+- `PortfolioSyncManager.update()` raises `PortfolioError` and aborts when `total_balance` cannot fund the rebuild — see [trading-reference.md](trading-reference.md)
+
 **v2.2.1** (2026-09-30)
 - `hold_until(..., exit_mode='state'|'event')`: **default restored to `'state'`** (sparse exit signals forward-fill, as in ≤ 2.0.21). 2.1.0–2.2.0 behaved as `'event'`; pass `exit_mode='event'` to reproduce those results — see [dataframe-reference.md](dataframe-reference.md)
 - `finlab.exceptions.SignedDownloadError` family for data-download failures (subclass of `DataError`)
