@@ -554,10 +554,21 @@ with data.universe(market='TSE_OTC'):
 
 ### Error: `requests.exceptions.ConnectionError`
 
-**Solution:** Reset kernel and retry.
+**Solution:** Transient network failure — retry with backoff. Since v2.2.1 FinLab raises `finlab.exceptions.SignedDownloadConnectionError`, a subclass of `requests.ConnectionError`, so the same `except` works on every version.
 
 ```python
-resetKernel()
+import time
+import requests
+from finlab import data
+
+for attempt in range(3):
+    try:
+        close = data.get('price:收盤價')
+        break
+    except requests.ConnectionError:
+        if attempt == 2:
+            raise
+        time.sleep(2 ** attempt * 5)   # 5s, 10s
 ```
 
 ### Error: 用量超限 (Quota Exceeded)
