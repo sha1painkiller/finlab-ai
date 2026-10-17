@@ -184,7 +184,7 @@ When reviewing any skill file, verify:
 
 - Commit messages: `<file>: <what changed>` (e.g., `backtesting-reference.md: Add trail_stop parameter docs`)
 - One logical change per commit
-- Bump `version` in `.claude-plugin/plugin.json` when skill content changes
+- Do NOT add `version` to `.claude-plugin/plugin.json` or `marketplace.json` — marketplace update detection uses the git commit (enforced by `tests/test_plugin_updates.py`)
 
 ### Quality Gates
 
