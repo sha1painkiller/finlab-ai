@@ -187,6 +187,8 @@ macd, macd_signal, macd_hist = data.indicator("MACD", fastperiod=12, slowperiod=
 
 Taiwan tables keep the exchange's units. Money in `monthly_revenue:*` and `financial_statement:*` is thousand TWD (千元): a monthly revenue of 214,752,761 is NT$214.75 billion. Prices and per-share figures are TWD; volumes and institutional net buys are shares. Income-statement fields of `financial_statement:*`, EPS included, cover that quarter alone, not the year to date. **Monthly revenue is dated when it is disclosed**, by the 10th of the following month: the row dated 2026-10-12 is September's revenue, so name the month it covers, not the month of its date. `data.describe("<TABLE>:<COLUMN>")` returns a field's catalog description.
 
+**Macro tables are dated by release, too.** `tw_business_indicators:*` and `tw_business_indicators_details:*` rows carry the 國發會 release date, usually around the 27th: the 2026-09-29 row of `景氣對策信號(分)` is August's score. `tw_monetary_aggregates:年增率(%)` (columns `M1B`, `M2`) is indexed at the month-end of the release month: its 2026-09-30 row is August (M1B 6.65%, M2 6.79%, released by the central bank on 2026-09-23). Use these rows at their index date — another one-month shift only delays the signal. One month can hold two releases (2026-03-09 is January, 2026-03-30 is February), so do not relabel the index to months and drop duplicates.
+
 **Filter by market/category using `data.universe()`:**
 
 ```python
