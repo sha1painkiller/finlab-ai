@@ -240,16 +240,13 @@ sim(position, resample=rev.index)
 # ❌ BAD
 condition = (close == 100.0)
 
-# ✅ GOOD - use inequalities or np.isclose()
-import numpy as np
-condition = np.isclose(close, 100.0)
-# Or better:
+# ✅ GOOD - use a tolerance band
 condition = (close > 99.9) & (close < 100.1)
 ```
 
 ### ❌ Don't Manually Align FinLabDataFrame Frequencies
 
-**Reason:** FinLabDataFrame already automatically aligns indices/columns. When monthly or quarterly string-index data is combined with daily data through FinLabDataFrame operators or boolean indexing, internal `reshape()` calls `index_str_to_date()` automatically, then forward-fills on the combined date grid. This applies to both Taiwan data such as `monthly_revenue:*` / `fundamental_features:*` and US data such as `us_income_statement:*` / `us_balance_sheet:*`.
+**Reason:** FinLabDataFrame aligns indices and columns automatically. When quarterly string-index data (Taiwan `fundamental_features:*`, US `us_income_statement:*` / `us_balance_sheet:*`) meets daily data through operators or boolean indexing, internal `reshape()` calls `index_str_to_date()`, then forward-fills on the combined date grid. `monthly_revenue:*` is already indexed by disclosure deadline and forward-fills the same way.
 
 ```python
 # Automatic PIT alignment
@@ -341,7 +338,8 @@ selected = latest_pe.loc[common][latest_combined.loc[common]]
 ```python
 # ✅ GOOD - leave index as-is
 revenue = data.get("monthly_revenue:當月營收")
-# Index may contain strings like "2022-01", "2022-02", etc.
+# Index is the disclosure deadline: 2022-01-10 holds December 2021 revenue
+# (10th of the following month, next trading day if a holiday)
 # FinLabDataFrame operators align dates and stock columns automatically
 position = revenue > revenue.shift(1)
 ```
@@ -528,12 +526,14 @@ sim(position, resample=rev.index)
 ### Pattern 6: Adjust Rebalance Offset
 
 ```python
-# Rebalance 1 week after period start
-sim(position, resample="M", resample_offset="1W")
+# Rebalance 7 days after each month-end
+sim(position, resample="M", resample_offset="7D")
 
-# Rebalance 1 month after quarter start
-sim(position, resample="Q", resample_offset="1M")
+# Rebalance 30 days after each quarter-end
+sim(position, resample="Q", resample_offset="30D")
 ```
+
+Use fixed-day offsets: `"1W"` snaps to the next Sunday, and `"1M"` raises `ValueError` in pandas 3.
 
 ---
 
@@ -541,7 +541,7 @@ sim(position, resample="Q", resample_offset="1M")
 
 ### Error: `_ArrayMemoryError`
 
-**Solution:** Release FinLab's in-memory data cache *(v2.2.5)*, drop your own large frames, and narrow the next read. If memory is still exhausted, restart the Python kernel.
+**Solution:** Release FinLab's in-memory data cache *(v2.2.5)*, drop your own large frames, and narrow the next read. If memory is still exhausted, restart the Python kernel or process; in FinLab Studio, use the `resetKernel` tool (it is not a Python function).
 
 ```python
 from finlab import data
@@ -597,7 +597,7 @@ for attempt in range(3):
    print(condition.head())
 
    # Step 3: Select stocks
-   position = condition.is_largest(10)
+   position = close[condition].is_largest(10)
    print(position.head())
    ```
 

@@ -588,7 +588,7 @@ def ls_order_position(short=5, mid=10, long=30):
 
 # Margin Maintenance Ratio
 def margin_position(short_par=5, long_par=30):
-    融資券總餘額 = data.get("margin_balance:融資券總餘額").fillna(method="ffill")
+    融資券總餘額 = data.get("margin_balance:融資券總餘額").ffill()
     融資今日餘額 = data.get("margin_transactions:融資今日餘額")
     close = data.get("price:收盤價")
     融資總餘額 = 融資券總餘額[["上市融資交易金額", "上櫃融資交易金額"]].sum(axis=1)
@@ -765,6 +765,7 @@ Advanced RSI-based strategy with multiple timeframes.
 ```python
 from finlab import data
 from finlab.backtest import sim
+import numpy as np
 import pandas as pd
 from finlab import dataframe
 
@@ -924,7 +925,7 @@ report   = sim(position, resample='M')
 ```python
 from finlab import data
 
-# Do NOT use us_ratios:pe — it is a short-history 2026-only snapshot table.
+# Do NOT use us_ratios:* — it is a short-history 2026-only snapshot table.
 # Compute trailing-twelve-months P/E from raw fundamentals instead.
 data.set_market('us')
 price = data.get('us_price:adj_close')

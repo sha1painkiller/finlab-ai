@@ -72,7 +72,7 @@ generate_features_and_labels(
 - `resample` (str, required): Resampling frequency string (e.g., 'M', 'Q', 'Y'), used for feature and label generation
 
 **Returns:**
-- `tuple[pd.DataFrame, pd.Series]`: (features, labels). features has date index with columns as factor names; labels are excess returns with the same index
+- `tuple[pd.DataFrame, pd.Series]`: (features, labels). features has a MultiIndex `('datetime', 'instrument')` with factor names as columns; labels are excess returns with the same index
 
 **Example:**
 ```python
@@ -108,8 +108,8 @@ calc_factor_return(
 ```
 
 **Parameters:**
-- `features` (pd.DataFrame, required): Feature DataFrame with date index, factor names as columns, and boolean values
-- `labels` (pd.Series, required): Label Series with date index and excess returns as values
+- `features` (pd.DataFrame, required): Feature DataFrame with MultiIndex `('datetime', 'instrument')`, factor names as columns, and boolean values
+- `labels` (pd.Series, required): Label Series with the same MultiIndex and excess returns as values
 
 **Returns:**
 - `pd.DataFrame`: Equal-weight portfolio period returns indexed by date with factor names as columns, starting from the first non-empty row
@@ -143,7 +143,7 @@ cumulative_return.plot(figsize=(12, 6))
 
 ### calc_ic
 
-Calculate the correlation coefficient (IC) between features and labels. Optionally rank features first for Rank IC. Outputs starting from the first non-empty row.
+Calculate the per-date correlation coefficient (IC) between features and labels: Pearson by default, Spearman Rank IC with `rank=True`.
 
 **Signature:**
 ```python
@@ -155,12 +155,12 @@ calc_ic(
 ```
 
 **Parameters:**
-- `features` (pd.DataFrame, required): Feature DataFrame with MultiIndex (date, stock_id) and factor names as columns
-- `labels` (pd.Series, required): Label Series with MultiIndex (date, stock_id)
-- `rank` (bool, optional, default=False): Whether to rank features first for calculating Rank IC
+- `features` (pd.DataFrame, required): Feature DataFrame with MultiIndex `('datetime', 'instrument')` and factor names as columns
+- `labels` (pd.Series, required): Label Series with the same MultiIndex
+- `rank` (bool, optional, default=False): `True` ranks features and labels per date (Spearman Rank IC); `False` computes Pearson IC
 
 **Returns:**
-- `pd.DataFrame`: IC values for each date and factor, starting from the first non-empty row
+- `pd.DataFrame`: IC values for each date and factor. With `rank=False`, starts at the first date where every factor that has any IC has one; with `rank=True`, includes leading NaN rows
 
 **Example:**
 ```python
@@ -171,7 +171,7 @@ price = data.get('etl:adj_close')
 marketcap = data.get('etl:market_value')
 revenue = data.get('monthly_revenue:當月營收')
 
-# Generate features and labels (MultiIndex: date, stock_id)
+# Generate features and labels (MultiIndex: datetime, instrument)
 features, labels = generate_features_and_labels({
     'marketcap': marketcap.rank(pct=True, axis=1) < 0.3,
     'revenue': (revenue.average(3) / revenue.average(12)).rank(pct=True, axis=1) < 0.3,
@@ -284,7 +284,7 @@ metric_df = calc_metric(factor, adj_close, func=custom_metric)
 
 ### calc_shapley_values
 
-Calculate Shapley values for each factor to measure marginal contribution to portfolio performance using cooperative game theory. Enumerates all factor subsets and averages marginal contributions. Computational complexity is O(2^n) where n is the number of factors.
+Score each boolean factor by the returns of the factor combinations that include it. For each date, it enumerates every non-empty factor combination, takes the mean excess return of the stocks that satisfy every factor in the combination (0 when none), and splits it evenly among the combination's factors; a factor's value is the sum of its shares over all combinations that include it. Despite the name, this is not the game-theoretic Shapley value: it does not measure the change in return from adding a factor, and the values do not sum to the return when all factors hold together.
 
 **Signature:**
 ```python
@@ -295,11 +295,11 @@ calc_shapley_values(
 ```
 
 **Parameters:**
-- `features` (pd.DataFrame, required): Feature DataFrame with date index, factor names as columns, and boolean values (True indicates selected)
-- `labels` (pd.Series, required): Label Series with MultiIndex ('datetime', 'stock_id') and excess returns as values
+- `features` (pd.DataFrame, required): Feature DataFrame with MultiIndex `('datetime', 'instrument')`, factor names as columns, and boolean values (True indicates selected)
+- `labels` (pd.Series, required): Label Series with the same MultiIndex and excess returns as values
 
 **Returns:**
-- `pd.DataFrame`: Daily Shapley values for each factor. Indexed by date with factor names as columns
+- `pd.DataFrame`: Per-date score for each factor. Indexed by date with factor names as columns
 
 **Example:**
 ```python
@@ -326,7 +326,7 @@ print(shapley_df.mean())
 shapley_df.plot(figsize=(12, 6))
 ```
 
-**Note:** Due to computational complexity, this function is best used with a small number of factors (typically < 10).
+**Note:** Computational complexity is O(2^n) where n is the number of factors, so this function is best used with a small number of factors (typically < 10).
 
 ---
 
@@ -372,7 +372,7 @@ print(centrality_df.head())
 
 ### calc_regression_stats
 
-Perform linear regression on each time series in a DataFrame and return statistics (slope, p-value, R², tail estimate, and trend classification). Uses vectorized implementation without SciPy dependency.
+Perform linear regression on each time series in a DataFrame and return statistics (slope, p-value, R², tail estimate, and trend classification). P-values use `scipy.stats`, which is installed with finlab.
 
 **Signature:**
 ```python
@@ -534,6 +534,7 @@ from finlab.tools.factor_analysis import (
     generate_features_and_labels,
     calc_factor_return
 )
+import matplotlib.pyplot as plt
 import pandas as pd
 
 # Define multiple factors
@@ -588,7 +589,7 @@ plt.show()
 1. **Use Rank IC for robustness** - Rank IC is more stable than raw IC
 2. **Analyze IC over time** - Look for consistent positive IC, not just average IC
 3. **Check IC trend** - Use calc_regression_stats to identify deteriorating factors
-4. **Calculate Shapley values** - Understand true factor contributions in multi-factor strategies
+4. **Calculate Shapley values** - See which factors appear in the best-performing factor combinations
 5. **Test multiple horizons** - Different factors may work at different time scales
 6. **Combine complementary factors** - Factors with low correlation often work better together
 7. **Monitor factor centrality** - High centrality may indicate overcrowding

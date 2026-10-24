@@ -101,12 +101,14 @@ sim(
 #### trail_stop
 - **Type:** `Union[float, None]`
 - **Default:** `None`
-- **Description:** Trailing stop threshold. If set to None, trailing stop is disabled.
+- **Description:** Giveback from peak return, measured relative to the current cost basis. `None` disables the trailing stop. For a long position with `trade_at_price='close'` and `touched_exit=False`, an armed trailing stop signals an exit when `(peak_price - close) / cost_basis > abs(trail_stop)`. Equality does not trigger (floating-point rounding can affect boundary comparisons). The signal fills on the next bar at the configured execution price, not at a guaranteed stop price.
+- **Example:** With cost basis 100, peak 150, `trail_stop=0.15` and `trail_stop_activation=0.20`, the trail is armed at +20% and the exit boundary is `150 - 0.15 * 100 = 135`. A close of 136 does not trigger; 135 is equality; 134 signals an exit. If the following bar closes at 133, close-price execution fills at 133. This is a 15-percentage-point return giveback, not a 15% fall from 150 (which would give 127.5).
+- **Rebalancing:** With the default `retain_cost_when_rebalance=False`, rebalancing resets the cost basis and tracked extrema; apply the formula within each unchanged-cost segment, not across the entire trade using its first entry price. `True` retains the cost basis. Intraday touch exits and short positions use their respective engine rules; the close-price long formula above should not be generalized to those paths.
 
 #### trail_stop_activation *(v2.0.12)*
 - **Type:** `Union[float, None]`
 - **Default:** `None`
-- **Description:** Unrealized-profit threshold (as a fraction, e.g. `0.05` = +5 %) that a position must reach before `trail_stop` is armed. While the position has not yet hit this gain, the trailing stop is dormant and only the static `stop_loss` (if set) applies. Once the gain is reached, the trail begins watermarking from the running peak as usual. `None` or `0` preserves the pre-2.0.12 behavior of arming `trail_stop` immediately. Works for both long and short positions in `sim()`; on `hold_until()` it controls the long-rotation trailing-take-profit path. Use this to let winners run past entry noise without giving back gains once a real trend forms — e.g. `trail_stop=0.08, trail_stop_activation=0.10` means "do nothing until +10 %, then trail 8 % off the high".
+- **Description:** Profit threshold that must be reached before `trail_stop` is armed (e.g. `0.20` means +20%). For a long position, activation occurs when the tracked peak price / current cost basis is at least `1 + abs(trail_stop_activation)`. Before activation, configured `stop_loss` and `take_profit` still apply. `None` or `0` arms the trail immediately. Supported for long and short positions in `sim()`; in `hold_until()` this parameter controls the long-rotation trailing-take-profit path.
 
 #### touched_exit
 - **Type:** `bool`
@@ -136,7 +138,7 @@ sim(
 #### upload
 - **Type:** `Union[bool, None]`
 - **Default:** `None`
-- **Description:** Whether to upload the strategy performance report after simulation. With `None` (default), the report is uploaded only when the environment variable `FINLAB_STRATEGY_NAME` or `FINLAB_FORCED_STRATEGY_NAME` is set (FinLab Studio and cloud schedules set them), so a plain local run does not upload. `upload=True` forces an upload; `upload=False` never uploads.
+- **Description:** Whether to upload the strategy performance report after simulation. `None` (default) uploads only when `FINLAB_FORCED_STRATEGY_NAME` is set (cloud-scheduled runs, notebooks run on the FinLab Studio website); since *v2.1.0* `FINLAB_STRATEGY_NAME` alone is not enough (before 2.1.0 it also triggered an upload). Local scripts, Jupyter and Colab therefore do not upload unless you pass `upload=True` or call `report.upload()` on the returned report. `upload=False` never uploads.
 
 #### end_date
 - **Type:** `Union[str, datetime.date, pd.Timestamp, None]` (keyword-only)
@@ -266,7 +268,7 @@ stats = report.get_stats()
 
 # Dictionary keys (note: different names than metrics methods!)
 print(f"Annual Return: {stats['cagr']:.2%}")
-print(f"Sharpe Ratio: {stats['monthly_sharpe']:.2f}")
+print(f"Sharpe Ratio: {stats['daily_sharpe']:.2f}")
 print(f"Max Drawdown: {stats['max_drawdown']:.2%}")
 print(f"Win Ratio: {stats['win_ratio']:.2%}")
 print(f"Total Return: {stats['total_return']:.2%}")
@@ -274,10 +276,10 @@ print(f"Total Return: {stats['total_return']:.2%}")
 
 **Available keys in `get_stats()`:**
 - `cagr` - Compound Annual Growth Rate
-- `daily_sharpe` - Daily Sharpe ratio
+- `daily_sharpe` - Daily Sharpe ratio (equals `get_metrics()['ratio']['sharpeRatio']`)
 - `monthly_sharpe` - Monthly Sharpe ratio
 - `max_drawdown` - Maximum drawdown (negative value)
-- `win_ratio` - Win rate of trades
+- `win_ratio` - Win rate of closed trades
 - `total_return` - Total cumulative return
 - `start` - Backtest start date (string)
 - `end` - Backtest end date (string)
@@ -304,6 +306,16 @@ print(metrics['risk']['maxDrawdown'])
 - `winrate` - winRate, m12WinRate, expectancy, mae, mfe
 - `liquidity` - capacity, disposalStockRatio, warningStockRatio
 
+**Sortino and its check-up threshold:** Reports with
+`metrics['backtest']['sortinoMethod'] == 'downside_deviation'` use
+`sqrt(mean(min(excess_return, 0)**2))` over all valid returns (above-target
+returns contribute zero). The check-up passes at Sortino > 1.6.
+Older saved reports without this marker retain the > 1.8 threshold.
+The new calculation generally lowers positive Sortino values, so recompute
+both strategies with the same FinLab version before comparing them.
+The 1.6 threshold approximates the former 1.8 standard but may change
+individual strategies' pass/fail results.
+
 ### `report.to_html()` — the canonical deliverable
 
 **Signature:**
@@ -313,14 +325,14 @@ report.to_html(path: str, title: str | None = None) -> None
 
 **Parameters:**
 - `path` (str, required): output file path; pass a `.html` filename, the file is written in place
-- `title` (str, optional, *v2.0.12*): browser-tab title for the exported page. Defaults to the strategy name. Set this when delivering several reports so the user can tell tabs apart at a glance. The FinLab favicon is bundled into the file automatically (also v2.0.12).
+- `title` (str, optional, *v2.0.12*): browser-tab title for the exported page. Defaults to `FinLab Report`, not the `sim(name=...)` strategy name. Set this when delivering several reports so the user can tell tabs apart at a glance. The FinLab favicon is bundled into the file automatically (also v2.0.12).
 
 **What the file contains:** a single self-contained HTML page (open in any browser, no server) with
 - equity curve and benchmark overlay
 - drawdown chart and drawdown table
 - monthly / annual return heatmap
 - full metric panel (CAGR, Sharpe, Sortino, Calmar, MDD, win rate, MAE/MFE, beta/alpha, capacity)
-- trade-by-trade table — entry/exit dates, prices, position size, return, holding days
+- trade-by-trade table of the most recent 500 trades — entry/exit dates, prices, position size, return, holding days
 
 **When to use:** after any `sim()` call the user will review (batch-run exception: see SKILL.md Step 4.5). It is the file the user actually opens to evaluate the strategy. Print-only summaries hide the equity curve and trade list and are not a substitute.
 
@@ -342,7 +354,7 @@ sim(pos_b, name="Value").to_html("value.html", title="Value")
 # Display interactive report inside Jupyter / IPython only
 report.display()
 
-# Get trade details as a DataFrame (same data the HTML embeds)
+# Get every trade as a DataFrame
 trades_df = report.get_trades()
 
 # Persist the full Report object (for later re-rendering / programmatic access)
@@ -354,6 +366,7 @@ report.run_analysis("Drawdown")
 report.run_analysis("MaeMfe")
 
 # ASCII fallback for terminals without a browser — supplement, not replacement
+# Requires: pip install 'finlab[terminal]'
 report.to_terminal()
 report.to_terminal(height=8, width=60, show_benchmark=False)
 ```
@@ -363,9 +376,9 @@ report.to_terminal(height=8, width=60, show_benchmark=False)
 | Desired Metric | `report.metrics.X()` | `report.get_stats()['X']` |
 |----------------|----------------------|---------------------------|
 | Annual Return | `annual_return()` | `'cagr'` |
-| Sharpe Ratio | `sharpe_ratio()` | `'monthly_sharpe'` |
+| Sharpe Ratio | `sharpe_ratio()` | `'daily_sharpe'` |
 | Max Drawdown | `max_drawdown()` | `'max_drawdown'` |
-| Win Rate | `win_rate()` | `'win_ratio'` |
+| Win Rate | `win_rate()` (includes open trades) | `'win_ratio'` (closed trades only) |
 | Total Return | - | `'total_return'` |
 
 ---
@@ -543,13 +556,13 @@ report.to_html("report.html")  # the file is what the user opens
 
 ## Exception Hierarchy — `finlab.exceptions`
 
-*(v2.0.0)* Previously most errors were raised as bare `Exception` or `ValueError`. Production code can now `except` on specific subclasses:
+*(v2.0.0)* Data-layer failures (quota, missing dataset, download) raise `DataError` subclasses; `sim()` input errors are still built-in `ValueError` / `TypeError`:
 
 ```python
 from finlab.exceptions import (
     FinlabError,      # root — catch-all for finlab-specific errors
     DataError,        # data fetch / parsing / schema
-    BacktestError,    # sim() validation and execution
+    BacktestError,    # defined but not raised
     BrokerError,      # broker account / order submission
     AuthError,        # login / token refresh
     PortfolioError,   # PortfolioSyncManager sync failures
@@ -563,13 +576,13 @@ from finlab.exceptions import (
 
 try:
     report = backtest.sim(position, resample='M')
-except BacktestError as e:
-    logger.warning(f"backtest failed: {e}")
 except DataError:
     logger.error("data layer failure — abort run")
+except (ValueError, TypeError) as e:
+    logger.warning(f"backtest failed: {e}")
 ```
 
-Internally `sim()` was refactored (v2.0.0) into five independently testable stages — `_validate_sim_inputs`, `_prepare_price_data`, `_normalize_position`, `_execute_simulation`, `_build_sim_report` — so errors now originate from a narrower context, which is why most call sites raise a specific `BacktestError` subclass instead of a generic exception.
+Catch `DataError` first: some download errors also subclass `ValueError`.
 
 ---
 
