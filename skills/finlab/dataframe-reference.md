@@ -81,7 +81,12 @@ print(cash_dated.index[:3])  # DatetimeIndex(['2013-04-19', '2013-04-24', '2013-
 # Normal factor construction does not need explicit conversion
 close = data.get('price:收盤價')
 condition = (cash > 0) & (close > close.average(60))
+
+# (v2.2.15) where/mask with a date-indexed cond convert the quarterly frame first
+cash_when_trending = cash.where(close > close.average(60))  # DatetimeIndex result
 ```
+
+Before 2.2.15, `quarterly.where(daily_cond)` / `.mask(daily_cond)` raised `putmask: mask and data must be the same size`; call `index_str_to_date()` first on older versions.
 
 **Note:** This method uses actual financial statement disclosure dates from `etl:financial_statements_disclosure_dates`, not simple quarter-end dates.
 
@@ -449,8 +454,8 @@ Generates trading positions based on entry signals until exit signals occur. Sup
 hold_until(
     exit: pd.DataFrame,
     nstocks_limit: int = None,
-    stop_loss: float = -np.inf,
-    take_profit: float = np.inf,
+    stop_loss: float | pd.DataFrame = -np.inf,
+    take_profit: float | pd.DataFrame = np.inf,
     trail_stop: float = np.inf,
     trail_stop_activation: float | None = 0,
     trade_at: str = 'close',
@@ -463,8 +468,8 @@ hold_until(
 **Parameters:**
 - `exit` (pd.DataFrame, required): Exit signal DataFrame
 - `nstocks_limit` (int, optional): Maximum number of stocks to hold simultaneously
-- `stop_loss` (float, optional, default=-np.inf): Stop loss threshold (e.g., 0.1 = exit if down 10%)
-- `take_profit` (float, optional, default=np.inf): Take profit threshold (e.g., 0.2 = exit if up 20%)
+- `stop_loss` (float | pd.DataFrame, optional, default=-np.inf): Stop loss threshold (e.g., 0.1 = exit if down 10%). *(v2.2.7)* A DataFrame (DatetimeIndex × stocks) gives per-stock, per-date thresholds: each day uses the latest row on or before it; NaN = no stop that day. Same rules as `sim(stop_loss=DataFrame)` — see [backtesting-reference.md](backtesting-reference.md#stop_loss)
+- `take_profit` (float | pd.DataFrame, optional, default=np.inf): Take profit threshold (e.g., 0.2 = exit if up 20%). *(v2.2.7)* Accepts a DataFrame like `stop_loss`
 - `trail_stop` (float, optional, default=np.inf (off)): Once armed, exits when `(peak_price - price) / entry_price > abs(trail_stop)`, where `price` is the adjusted `trade_at` price and `peak_price` its high since entry (e.g., entry 100, peak 150, 0.15 = exit below 135, not 127.5)
 - `trail_stop_activation` (float, optional, default=0, *v2.0.12*): Gain required before `trail_stop` arms (e.g. 0.1 = +10%); `0`/`None` arm immediately. Before activation, `stop_loss` and `take_profit` still apply; only `trail_stop` waits
 - `trade_at` (str, optional, default='close'): Price reference for stop/take profit ('close' or 'open')
