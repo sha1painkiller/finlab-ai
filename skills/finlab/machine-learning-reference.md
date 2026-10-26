@@ -126,7 +126,7 @@ feature.combine(
 
 **Parameters:**
 - `features` (dict, required): Dictionary where keys are feature names and values are DataFrames (index=datetime, columns=instrument)
-- `resample` (str, optional, default=None): Optional argument to resample data in features (e.g., 'W', 'M')
+- `resample` (str | pd.DatetimeIndex, optional, default=None): Frequency string (e.g., 'W', 'M') or explicit dates. String frequencies label calendar periods (`'W'` = Sunday); pass a `DatetimeIndex` to anchor on actual trading dates. *(v2.2.10)* MultiIndex features (e.g. qlib `Alpha158`) are resampled the same way as wide features; before 2.2.10 they were passed through unresampled
 - `sample_filter` (pd.DataFrame, optional, default=None): Boolean DataFrame (index=date, columns=instrument) representing the filter of features
 - `**kwargs`: Additional keyword arguments to pass to the resampler function
 
@@ -174,7 +174,7 @@ label.return_percentage(
 
 **Parameters:**
 - `index` (pd.Index, required): Multi-level index of datetime and instrument
-- `resample` (str, optional, default=None): Resample frequency for output data (e.g., 'W', 'M')
+- `resample` (str | pd.DatetimeIndex, optional, default=None): Resample frequency (e.g., 'W', 'M') or the same `DatetimeIndex` passed to `feature.combine` so labels and features share dates *(v2.2.10)*
 - `period` (int, optional, default=1): Number of periods to calculate percentage change over
 - `trade_at_price` (str, optional, default='close'): Price for execution ('open', 'high', 'low', 'close')
 - `bfill` (bool, optional, default=False): Whether to backfill missing price data before calculation
