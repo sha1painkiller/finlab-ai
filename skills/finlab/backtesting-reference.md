@@ -26,8 +26,8 @@ sim(
     fee_ratio: Union[float, None] = None,   # None -> market default (TW: 1.425/1000)
     tax_ratio: Union[float, None] = None,   # None -> market default (TW: 3/1000)
     name: str = '未命名',
-    stop_loss: Union[float, None] = None,
-    take_profit: Union[float, None] = None,
+    stop_loss: Union[float, pd.DataFrame, None] = None,
+    take_profit: Union[float, pd.DataFrame, None] = None,
     trail_stop: Union[float, None] = None,
     trail_stop_activation: Union[float, None] = None,
     touched_exit: bool = False,
@@ -61,7 +61,7 @@ sim(
 #### resample_offset
 - **Type:** `Union[str, None]`
 - **Default:** `None`
-- **Description:** An optional time offset (e.g., '1D', '1H') applied to rebalance dates.
+- **Description:** Pandas offset string (e.g. `'1D'`, `'7D'`) added to every rebalance date. *(v2.2.7)* Also applies to supplied dates (a `DatetimeIndex`, Series or DataFrame `resample`); before 2.2.7 it only shifted frequency strings.
 
 #### trade_at_price
 - **Type:** `Union[str, pd.DataFrame]`
@@ -89,14 +89,29 @@ sim(
 - **Description:** Name for the strategy (for reporting purposes).
 
 #### stop_loss
-- **Type:** `Union[float, None]`
+- **Type:** `Union[float, pd.DataFrame, None]`
 - **Default:** `None`
-- **Description:** Stop loss percentage threshold. If set to None, stop loss is disabled.
+- **Description:** Loss from entry cost that triggers an exit (e.g. `0.08` = −8%). `None` disables it. *(v2.2.7)* A DataFrame (DatetimeIndex × stock columns) sets per-stock, time-varying thresholds: each bar uses the latest row dated on or before it (strictly before with `touched_exit=True`). NaN, `0`, missing stocks and dates before the first row mean no stop. With a DataFrame, `report.stop_loss` is `None`. Index must be a unique `DatetimeIndex` without NaT, otherwise `TypeError` / `ValueError`.
 
 #### take_profit
-- **Type:** `Union[float, None]`
+- **Type:** `Union[float, pd.DataFrame, None]`
 - **Default:** `None`
-- **Description:** Take profit percentage threshold. If set to None, take profit is disabled.
+- **Description:** Gain from entry cost that triggers an exit (e.g. `0.2` = +20%). `None` disables it. *(v2.2.7)* Accepts a DataFrame with the same rules as `stop_loss`.
+
+```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.is_largest(10)
+
+# 5% stop below the 60-day mean, 10% stop above it
+below_ma = close < close.average(60)
+stop = below_ma.astype(float) * 0.05 + (~below_ma).astype(float) * 0.10
+
+report = sim(position, resample='M', stop_loss=stop, upload=False)
+print(report.stop_loss)  # None: no single threshold to report
+```
 
 #### trail_stop
 - **Type:** `Union[float, None]`
@@ -165,21 +180,22 @@ An instance of `Report` containing performance metrics, trades, and additional a
 
 - **Sale bar:** with an exchange delisting notice (`market.get_delisting_notices()`; TW reads `delisting_announcements`), the first priced bar after the announcement. Without a notice, the last priced bar, if prices stop at least 20 bars before the end of the data (a shorter gap may be a trading halt).
 - **Cash:** with `resample=None` the portfolio rebalances on the sale day. Otherwise the cash waits for the next rebalance.
-- **Warning:** `finlab.backtest.delisting.DelistedHoldingWarning` lists each affected symbol and its sale date (`None` when the sale falls after the data).
+- **No warning** *(v2.2.9)*: `DelistedHoldingWarning` (2.1.0–2.2.8) was removed; importing it raises `ImportError`. Find affected trades by joining `report.get_trades()` with the delisting notices:
 
 ```python
-import warnings
 from finlab import data
 from finlab.backtest import sim
-from finlab.backtest.delisting import DelistedHoldingWarning
+from finlab.markets.tw import TWMarket
 
 close = data.get('price:收盤價')
-with warnings.catch_warnings(record=True) as caught:
-    warnings.simplefilter('always', DelistedHoldingWarning)
-    report = sim(close.is_largest(10), resample='M', upload=False)
-delisted = [w.message for w in caught if issubclass(w.category, DelistedHoldingWarning)]
-print(delisted[0] if delisted else 'no delisted holdings')
+report = sim(close.is_largest(10), resample='M', upload=False)
+
+notices = TWMarket().get_delisting_notices()  # index: symbol; columns: announced, delisted
+trades = report.get_trades()
+print(trades[trades['stock_id'].isin(notices.index)])  # trades in stocks with a delisting notice
 ```
+
+- **Indicators** *(v2.2.16)*: `data.indicator()` returns NaN once a stock has gone 20 bars without a price, instead of forward-filling its last value forever; a halted stock gets its values back from its next price.
 
 ### Stop Exits and Live Targets *(v2.2.3, v2.2.5)*
 
@@ -364,6 +380,13 @@ loaded_report = Report.from_pickle("report.pkl")
 # Run specific analysis modules (also rendered into to_html output)
 report.run_analysis("Drawdown")
 report.run_analysis("MaeMfe")
+
+# (v2.2.14) Strategy check-up — the same pass/fail panel as to_html, without a browser
+print(report.to_checkup_text())         # lang='zh-tw' (default) or 'en'
+checkup = report.get_checkup(lang='en')  # dict: title, lang, note, categories
+for cat in checkup['categories']:        # each: key, question, summary, health, health_label, passed, total, checks
+    print(cat['question'], f"{cat['passed']}/{cat['total']}")
+# A check with too little data has value None and status 'insufficient_data'; it does not count as passed
 
 # ASCII fallback for terminals without a browser — supplement, not replacement
 # Requires: pip install 'finlab[terminal]'
@@ -572,10 +595,14 @@ from finlab.exceptions import (
     DatasetNotFoundError,  # (v2.1.0) DataError; data.get() on an unknown key; .suggestions holds close matches
     LoginError,            # (v2.1.0) AuthError; finlab.login() browser login failed or timed out
     SignedDownloadError,   # (v2.2.1) DataError; signed data-URL download failed; .dataset, .status
+    QuotaExceededError,    # (v2.2.14) DataError and RuntimeError; daily download quota exhausted
 )
 
 try:
     report = backtest.sim(position, resample='M')
+except QuotaExceededError:
+    logger.error("quota exhausted — stop the batch, retry after 08:00 UTC+8")
+    raise
 except DataError:
     logger.error("data layer failure — abort run")
 except (ValueError, TypeError) as e:
