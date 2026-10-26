@@ -87,6 +87,7 @@ upperband, middleband, lowerband = data.indicator(
 ```python
 # ❌ WRONG - don't pass close
 rsi = data.indicator("RSI", close, timeperiod=14)  # ERROR
+rsi = data.indicator("RSI", close=close, timeperiod=14)  # v2.2.7: ValueError that suggests talib.abstract per stock
 ```
 
 **Keyword validation** *(v2.2.2)*: TA-Lib keywords the indicator does not accept raise `ValueError` instead of being silently ignored. Before 2.2.2, a typo such as `timperiod=14` ran with the defaults.
@@ -582,6 +583,50 @@ for attempt in range(3):
 1. **等待重置** - UTC+8 早上 8 點會自動重置用量
 2. **升級方案** - 升級可獲得更多資料用量，詳見 https://www.finlab.finance/payment
 3. **減少用量** - 避免重複取得相同數據，將常用數據存入變數；使用 `data.universe()` 限制股票範圍
+
+*(v2.2.14)* 用量超限會拋出 `finlab.exceptions.QuotaExceededError`（同時是 `DataError` 與 `RuntimeError`）。批次腳本要在其他例外之前捕捉它並停止，不要逐檔重試：
+
+```python
+from finlab import data
+from finlab.exceptions import QuotaExceededError
+
+keys = ['price:收盤價', 'price:成交股數', 'monthly_revenue:當月營收']
+frames = {}
+for key in keys:
+    try:
+        frames[key] = data.get(key)
+    except QuotaExceededError as e:
+        print(f'停止：{e}')  # 08:00 UTC+8 重置後再跑
+        break
+```
+
+*(v2.2.15)* 估算與記錄用量：
+
+```python
+import pandas as pd
+from finlab import data
+
+plan = data.plan_download('price:收盤價')  # 不下載；每列 full / recent / delta：size_bytes, would_download, planned_bytes, route
+print(plan[['size_bytes', 'would_download', 'planned_bytes']])
+
+with data.download_usage() as rows:       # 區塊內每次下載一列：dataset, event, payload, billed_bytes, error, quota
+    data.get('price:開盤價')
+print(pd.DataFrame(rows))
+```
+
+`plan_download()` 是快照估計，實際計費可能因 hash/merge fallback 而不同。
+
+### Error: VIP 付費方案的資料集 *(v2.2.15)*
+
+**訊息:** `<dataset> 是 VIP 付費方案的資料集，免費帳號（含試用期已結束）無法下載（Dataset is only for VIP: <dataset>）`
+
+免費帳號 `data.get()` VIP 資料集時拋出 `RuntimeError`，訊息附訂閱連結。下載前用 `data.search('關鍵字', details=True)` 的 `auth` 欄位確認權限；找不到資料集時的相近建議也會標註「VIP 付費方案」。
+
+### Warning: 資料曾在排程外更新 *(v2.2.10)*
+
+**訊息:** `<dataset> 資料曾在排程外更新（<UTC 時間>），歷史值與回測結果可能改變。…可用 data.get('<dataset>', as_of='<修正前時間>') 查看修正前版本。`
+
+上游修正了歷史值。這是 logger warning，不會中斷執行；回測結果與前次不同時先看這則訊息，用提示的 `as_of=` 重現修正前的結果（付費方案、伺服器仍保留該版本時才可用）。`financial_statement:*` 改提示 `data.get('financial_statement_versions')`。
 
 ### Debugging Tips
 
