@@ -347,6 +347,29 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 
 Short version pointers for features added in recent releases. Each reference file tags the exact API with `(vX.Y.Z)`.
 
+**v2.2.16** (2026-10-21)
+- `data.indicator()` returns NaN after a stock has gone 20 bars without a price (delisted) instead of forward-filling its last value — see [backtesting-reference.md](backtesting-reference.md)
+
+**v2.2.15** (2026-10-21)
+- `quarterly.where(cond)` / `.mask(cond)` with a date-indexed `cond` convert to disclosure dates first instead of raising `putmask` — see [dataframe-reference.md](dataframe-reference.md)
+- `data.plan_download(dataset)` (usage estimate, no download) and `data.download_usage()` (per-download log); VIP-only datasets raise a clear `RuntimeError` for free accounts — see [best-practices.md](best-practices.md)
+
+**v2.2.14** (2026-10-19)
+- `report.get_checkup(lang)` / `report.to_checkup_text(lang)`: the HTML report's strategy check-up as a dict or printable text — see [backtesting-reference.md](backtesting-reference.md)
+- `finlab.exceptions.QuotaExceededError` (`DataError` + `RuntimeError`) on daily quota exhaustion — see [best-practices.md](best-practices.md)
+
+**v2.2.10** (2026-10-10)
+- `feature.combine()` / `label.return_percentage()` accept a `DatetimeIndex` `resample`; MultiIndex (qlib) features are now resampled — see [machine-learning-reference.md](machine-learning-reference.md)
+- `data.get()` logs a warning when a dataset was corrected outside its schedule, with the `as_of=` value that reproduces the pre-correction data — see [best-practices.md](best-practices.md)
+
+**v2.2.9** (2026-10-10)
+- `DelistedHoldingWarning` removed (`ImportError` on import); delisted holdings are still sold — see [backtesting-reference.md](backtesting-reference.md)
+
+**v2.2.7** (2026-10-08)
+- `sim()` / `hold_until()`: `stop_loss` and `take_profit` accept a DataFrame of per-stock, per-date thresholds — see [backtesting-reference.md](backtesting-reference.md#stop_loss)
+- `resample_offset` also shifts supplied rebalance dates (`DatetimeIndex` / Series / DataFrame `resample`)
+- `data.indicator(..., close=...)`-style price kwargs raise `ValueError` pointing to TA-Lib
+
 **v2.2.6** (2026-10-05)
 - Default data cache falls back to the system temp directory on Cloud Run, Cloud Functions and AWS Lambda, or whenever the home cache is not writable
 
