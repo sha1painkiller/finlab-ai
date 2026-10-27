@@ -63,7 +63,7 @@ Calculate technical indicator values for a list of feature names.
 **Signature:**
 ```python
 feature.ta(
-    feature_names: Optional[List[str]],
+    feature_names: Optional[List[str]] = None,
     factories = None,
     resample = None,
     start_time = None,
@@ -391,6 +391,7 @@ from finlab import data
 from finlab.ml import feature, label
 from lightgbm import LGBMRegressor
 from sklearn.feature_selection import SelectKBest, f_regression
+import numpy as np
 import pandas as pd
 
 # Generate many features
@@ -414,7 +415,9 @@ sample_filter = data.get('price:成交股數') > 200_000
 X = feature.combine(features_dict, resample='M', sample_filter=sample_filter)
 y = label.excess_over_mean(X.index, resample='M', period=1)
 
-# Remove NaN
+# Remove NaN and ±inf (ps is inf when revenue per share is 0; f_regression rejects inf).
+# Replace after combine: combine forward-fills NaN, so an earlier replace leaves stale values
+X = X.replace([np.inf, -np.inf], np.nan)
 mask = ~(X.isna().any(axis=1) | y.isna())
 X = X[mask]
 y = y[mask]
