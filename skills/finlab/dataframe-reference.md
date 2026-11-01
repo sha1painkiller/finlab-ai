@@ -90,6 +90,8 @@ Before 2.2.15, `quarterly.where(daily_cond)` / `.mask(daily_cond)` raised `putma
 
 **Note:** This method uses actual financial statement disclosure dates from `etl:financial_statements_disclosure_dates`, not simple quarter-end dates.
 
+Before offline quarterly conversion, validate each populated stock/quarter against its date dependencies. See [date coverage and snapshot replay](data-reproducibility.md#check-taiwan-quarterly-date-coverage-before-computing); 2.2.22 can silently retain an older quarter when offline date tables are incomplete.
+
 ---
 
 ### deadline

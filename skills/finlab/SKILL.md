@@ -1,6 +1,6 @@
 ---
 name: finlab
-description: Comprehensive guide for FinLab quantitative trading package across global stock markets (TW, US, KR, JP, HK; both single-name equities and ETFs/funds). Use when working with trading strategies, backtesting, stock data, FinLabDataFrame, factor analysis, stock selection, or when the user mentions FinLab, trading, quant trading, US equity, S&P 500 / NASDAQ 100, SPY / QQQ, sector or leveraged ETFs, ETF rotation, 美股, or stock market analysis. Includes data access, strategy development, backtesting workflows, best practices, and US-market specifics (data availability map, filing-date-aligned quarterly fundamentals, US universe construction, USMarket vs. USFundMarket defaults, and ETF backtesting).
+description: "Backtest and research stock strategies with the FinLab Python package on real market data: Taiwan stocks (台股) first, plus US, KR, JP, HK equities and ETFs/funds. Use whenever the user wants to backtest a strategy, screen stocks, or pull Taiwan stock data such as adjusted prices, monthly revenue, financial statements or institutional flows, even if they never name FinLab: 台股回測, 股票回測, 回測, 選股, 選股策略, 量化交易, 程式交易, 月營收, 三大法人, 財報, 美股回測, backtesting, trading strategies, stock data, stock selection, FinLabDataFrame, factor analysis, quant trading, US equity, S&P 500 / NASDAQ 100, SPY / QQQ, sector or leveraged ETFs, ETF rotation, 美股, or stock market analysis. Includes data access, strategy development, backtesting workflows, best practices, and US-market specifics (data availability map, filing-date-aligned quarterly fundamentals, US universe construction, USMarket vs. USFundMarket defaults, and ETF backtesting)."
 compatibility: Requires Python 3.10+ and uv package manager (https://docs.astral.sh/uv/)
 ---
 
@@ -202,6 +202,8 @@ data.set_universe(market='TSE_OTC', category='半導體')
 
 Use `data.search('keyword', market='<code>')` to discover available datasets; `market` takes any `set_market` code from [Market Support](#market-support), or `'all'` to search every market. Use keywords in the dataset's native language (e.g. `data.search('營收', market='tw')`, `data.search('revenue', market='us')`).
 
+For retained publication versions (`data.versions`, `as_of`, `version=`), complete `data.snapshot` recording/replay, and per-stock/per-quarter date coverage checks before offline research, read [data-reproducibility.md](data-reproducibility.md). A historical read of one table does not pin later date-conversion or backtest dependencies.
+
 ### Step 2: Create Factors & Conditions
 
 Use FinLabDataFrame methods to create boolean conditions:
@@ -308,7 +310,7 @@ See the "`report.to_html()` — the canonical deliverable" section of [backtesti
 
 ### Step 5: Execute Orders (Optional)
 
-Convert backtest results to live trading:
+Convert backtest results to live trading. **Never place real orders on your own:** run `create_orders(view_only=True)`, show the user the preview, and call `create_orders()` only after the user confirms those orders in this conversation.
 
 ```python
 from finlab.online.order_executor import Position, OrderExecutor
@@ -324,7 +326,7 @@ acc = SinopacAccount()
 executor = OrderExecutor(position, account=acc)
 executor.create_orders(view_only=True)  # Preview first
 
-# 4. Execute orders (when ready)
+# 4. Execute only after the user confirms the preview
 executor.create_orders()
 ```
 
@@ -340,6 +342,7 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 | [dataframe-reference.md](dataframe-reference.md)               | FinLabDataFrame 方法                       |
 | [factor-analysis-reference.md](factor-analysis-reference.md)   | IC、Shapley、因子分析                      |
 | [best-practices.md](best-practices.md)                         | 常見錯誤、lookahead bias                   |
+| [data-reproducibility.md](data-reproducibility.md)             | Historical publications, snapshot replay, quarterly date coverage |
 | [machine-learning-reference.md](machine-learning-reference.md) | ML 特徵工程                                |
 | [us-market.md](us-market.md)                                   | US market specifics: data map, quarterly alignment, defaults, universe construction |
 
