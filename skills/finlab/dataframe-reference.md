@@ -13,7 +13,7 @@ FinlabDataFrame is a powerful extension of pandas DataFrame specifically designe
 - Multi-factor and industry neutralization
 - Integration with backtesting workflows
 
-**Contents:** [Constructor](#constructor) | [Index Conversion](#index-conversion-methods) | [Moving Average & Comparison](#moving-average--comparison-methods) | [Selection](#selection-methods) | [Signal Detection](#signal-detection-methods) | [Industry & Category](#industry--category-methods) | [Neutralization](#neutralization-methods) | [Quantile](#quantile-methods) | [Cross-Sectional (`.cs`)](#cross-sectional-accessor-cs) | [Within-Industry (`.sector`)](#within-industry-accessor-sector) | [Portfolio Weight (`.weight`)](#portfolio-weight-accessor-weight) | [Rolling Statistics](#rolling-statistics) | [Auto Alignment](#automatic-index-alignment) | [Method Chaining](#method-chaining-patterns)
+**Contents:** [Constructor](#constructor) | [Index Conversion](#index-conversion-methods) | [Moving Average & Comparison](#moving-average--comparison-methods) | [Selection](#selection-methods) | [Signal Detection](#signal-detection-methods) | [Industry & Category](#industry--category-methods) | [Neutralization](#neutralization-methods) | [Quantile](#quantile-methods) | [Cross-Sectional (`.cs`)](#cross-sectional-accessor-cs) | [Within-Industry (`.sector`)](#within-industry-accessor-sector) | [Portfolio Weight (`.weight`)](#portfolio-weight-accessor-weight) | [Rolling Statistics](#rolling-statistics) | [pandas Overrides](#pandas-method-overrides) | [Auto Alignment](#automatic-index-alignment) | [Method Chaining](#method-chaining-patterns)
 
 ---
 
@@ -929,6 +929,36 @@ vol60 = returns.rolling(60).std()
 skew = returns.rolling(60).skew()
 lottery = skew.cs.rank() > 0.8  # top 20% positive skew
 ```
+
+*(v2.2.23)* Numeric frames compute `rolling()` columns concurrently. Results are unchanged.
+
+---
+
+## pandas Method Overrides
+
+FinlabDataFrame pins these pandas methods to the same behavior on pandas 2 and 3:
+
+| Method | Since | Behavior |
+|---|---|---|
+| `pct_change(periods=1, fill_method=None)` | v2.3.1 | Missing values are **not** forward-filled: a NaN at either end gives NaN. Before 2.3.1 on pandas 2, the last valid value was carried across gaps (e.g. a trading halt) |
+| `fillna(value)` with a `bool` value | v2.3.1 | Returns a `bool` frame when every cell is a bool once filled, so `~cond.shift().fillna(False)` stays a boolean negation (pandas 3 alone leaves `object`, where `~` yields -1/-2) |
+
+```python
+import numpy as np
+import pandas as pd
+from finlab.dataframe import FinlabDataFrame
+
+idx = pd.date_range("2024-01-01", periods=4)
+close = FinlabDataFrame({"2330": [100.0, np.nan, 110.0, 121.0]}, index=idx)
+
+print(close.pct_change()["2330"].round(4).tolist())          # [nan, nan, nan, 0.1]
+print(close.ffill().pct_change()["2330"].round(4).tolist())  # [nan, 0.0, 0.1, 0.1] — pre-2.3.1 result
+
+held = (close > 105).shift().fillna(False)
+print(held.dtypes.iloc[0], (~held)["2330"].tolist())         # bool [True, True, True, False]
+```
+
+**Impact:** momentum factors such as `close.pct_change(20)` now give NaN for a stock whose price is missing on either endpoint, so `is_largest()` skips it that day. Use `close.ffill().pct_change(20)` to reproduce pre-2.3.1 backtests.
 
 ---
 
