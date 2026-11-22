@@ -380,6 +380,7 @@ loaded_report = Report.from_pickle("report.pkl")
 
 # Run specific analysis modules (also rendered into to_html output)
 report.run_analysis("Drawdown")
+# Requires: pip install plotly
 report.run_analysis("MaeMfe")
 
 # (v2.2.14) Strategy check-up — the same pass/fail panel as to_html, without a browser

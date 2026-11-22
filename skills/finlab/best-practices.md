@@ -182,7 +182,7 @@ oldest = data.get('price:收盤價', as_of=versions['time_created'].iloc[0])
 
 Only versions the server still retains are listed. Intraday bars *(v2.0.20)*: `data.get('tw_minute:2330', start=..., end=...)` and `tw_tick:<symbol>` return long-form after-market frames and require both dates (at most 31 calendar days).
 
-Use `data.search('keyword', market='<market>')` to discover available datasets and `data.universe()` parameters. It returns a `pd.Series` of dataset names *(v2.0.16; a `list` before that)*. Supported markets: `tw`, `us`, `kr`, `jp`, `hk`. Use keywords in the dataset's native language (e.g. `'營收'` for `tw`, `'revenue'` for `us`).
+Use `data.search('keyword', market='<code>')` to discover available datasets; `market` takes any `set_market` code from [Market Support](SKILL.md#market-support), or `'all'` to search every market. It returns a `pd.Series` of dataset names *(v2.0.16; a `list` before that)*. Use keywords in the dataset's native language (e.g. `data.search('營收', market='tw')`, `data.search('revenue', market='us')`).
 
 Check access and metadata before downloading:
 

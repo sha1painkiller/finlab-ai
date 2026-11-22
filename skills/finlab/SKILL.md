@@ -448,7 +448,7 @@ Short version pointers for features added in recent releases. Each reference fil
 - `data.search(market="rotc")`: scoped to the emerging-market catalog only
 
 **v2.0.1** (2026-04-26)
-- `python -m finlab cloud` *(CLI)*: deploy strategies to the `finlab-auto-update` Cloud Functions runtime with daily Asia/Taipei scheduling — `deploy`, `get`, `list`, `run`, `logs`, `schedule set/delete`, `delete`, `status`. See [trading-reference.md](trading-reference.md#cloud-strategy-deployment--python--m-finlab-cloud-v201)
+- `python -m finlab cloud` *(CLI)*: deploy strategies to the `finlab-auto-update` Cloud Functions runtime with daily, weekly, monthly, or custom cron scheduling in Asia/Taipei (frequency options since v2.2.9) — `deploy`, `get`, `list`, `run`, `logs`, `schedule set/delete`, `delete`, `status`. See [trading-reference.md](trading-reference.md#cloud-strategy-deployment--python--m-finlab-cloud-v201)
 - `sim()` peak RSS ~800 MB lower on full-market monthly strategies (was ~2.0–2.2 GiB → ~1.29 GiB); enables s-tier cloud workers that previously OOM'd
 
 **v2.0.0** (2026-04-22) — major release
@@ -502,6 +502,35 @@ prev_close = close.shift(1)
 ```
 
 See [best-practices.md](best-practices.md) for more anti-patterns.
+
+## When Today's Taiwan Data Is Final
+
+Several tables update more than once after the close, and early runs can publish a preliminary version. When choosing a daily strategy's run time, check when its data is final (finlab >= 2.3.9; no download):
+
+```python
+from finlab import data
+
+info = data.describe("price:成交股數")
+print(info["final_after"])                          # 18:32
+print(info["schedule"], info["schedule_timezone"])  # 32 15,16,18,21 * * * Asia/Taipei
+```
+
+- `final_after`: the run after which the whole table's values for the day are final (`price`: 18:32, for its volumes); `None` means every run publishes complete data.
+- `schedule`: the runs that update the dataset, cron in `schedule_timezone`. An `etl:*` dataset is rebuilt after each table it reads, so it lists their runs.
+
+A run publishes a few to about 20 minutes after it starts. Typical times (Taipei):
+
+| Data | Final run (published) | Note |
+|---|---|---|
+| `price` open, high, low, close | 15:32 (~15:50) | |
+| `etl:adj_close` and the other adjusted prices | ~15:50 | A 17:00 run can update dividends or capital reductions; catalog says 18:32, following `price` |
+| `price:成交股數`, `成交金額`, `成交筆數` | 18:32 (~18:50) | The 15:32 run lacks block trades (鉅額交易); 21:32 rechecks |
+| `foreign_investors_shareholding:發行股數` | 21:00 (~21:05) | Sometimes the 22:00 or 23:00 retry |
+| `institutional_investors_trading_summary` | 21:02 (~21:10) | The 18:02 run lacks block trades |
+| `etl:market_value` | 21:32 (~21:55) | Listed stocks' share counts arrive at 21:00 |
+| `monthly_revenue` | Every run (days 1–20, 07:01 and 17:01–20:01) | Each run has the companies reported so far |
+
+`data.is_tradable()` is stricter: True only once every loaded dataset has had its last scheduled run before the next open (21:32 for `price`).
 
 ## Performance Defaults
 
