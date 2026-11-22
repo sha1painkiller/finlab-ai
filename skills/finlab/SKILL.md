@@ -194,6 +194,8 @@ Taiwan tables keep the exchange's units. Money in `monthly_revenue:*` and `finan
 **Filter by market/category using `data.universe()`:**
 
 ```python
+from finlab import data
+
 # Limit to specific industry
 with data.universe(market='TSE_OTC', category=['水泥工業']):
     price = data.get('price:收盤價')
@@ -211,6 +213,12 @@ For retained publication versions (`data.versions`, `as_of`, `version=`), comple
 Use FinLabDataFrame methods to create boolean conditions:
 
 ```python
+from finlab import data
+
+close = data.get('price:收盤價')
+pe = data.get('price_earning_ratio:本益比')
+roe = data.get('fundamental_features:ROE稅後')
+
 # Trend
 rising = close.rise(10)  # Rising vs 10 days ago
 sustained_rise = rising.sustain(3)  # Rising for 3 consecutive days
@@ -234,11 +242,17 @@ See [dataframe-reference.md](dataframe-reference.md) for all FinLabDataFrame met
 Combine conditions with `&` (AND), `|` (OR), `~` (NOT):
 
 ```python
+from finlab import data
+
+close = data.get('price:收盤價')
+pb = data.get('price_earning_ratio:股價淨值比')
+volume = data.get('price:成交股數')
+
 # Simple position: hold stocks meeting all conditions
-position = cond1 & cond2 & cond3
+position = (close > close.average(60)) & (pb < 1.5) & (volume.average(20) > 500_000)
 
 # Limit number of stocks
-position = factor[condition].is_smallest(10)  # Hold top 10
+position = pb[close > close.average(60)].is_smallest(10)  # 10 lowest P/B above their 60-day MA
 
 # Entry/exit signals with hold_until
 entries = close > close.average(20)
@@ -255,7 +269,11 @@ position = entries.hold_until(exits, nstocks_limit=10, rank=-pb)
 ### Step 4: Backtest
 
 ```python
+from finlab import data
 from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
 
 # Basic backtest
 report = sim(position, resample="M")
@@ -300,6 +318,12 @@ See [backtesting-reference.md](backtesting-reference.md) for complete `sim()` AP
 Follow each backtest the user will review with one HTML file — the one FinLab generates:
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+
 report = sim(position, resample="M", upload=False)
 report.to_html("report.html")            # the FinLab-generated file is the deliverable
 ```
@@ -513,6 +537,10 @@ Never use `reindex()` or `reindex_like()`, including on final positions. FinLabD
 **Critical:** Avoid using future data to make past decisions:
 
 ```python
+from finlab import data
+
+close = data.get('price:收盤價')
+
 # ✅ GOOD: Use shift(1) to get previous value
 prev_close = close.shift(1)
 
@@ -562,6 +590,8 @@ A run publishes a few to about 20 minutes after it starts. Typical times (Taipei
 **Pass `lazy=True` by default; drop to eager pandas only when debugging.** `data.get(..., lazy=True)` and `data.gets(..., lazy=True)` *(v2.0.0)* return a `LazyWide` (not a DataFrame) that defers the compute graph until a terminal call materializes it — chained ops avoid redundant passes (single-CPU). FinLabDataFrame methods and `sim()` take it directly; don't collect before `sim()`, which computes only rebalance dates. For pandas access (`.loc`, `.iloc`, `.columns`, `.index`, `pd.concat`), collect once (`close = price.collect()`) and reuse the result: each `.collect()` recomputes the whole graph.
 
 ```python
+from finlab import data
+
 # ✅ Default: fetch lazy directly
 price, volume, pe = data.gets(
     'price:收盤價', 'price:成交股數', 'price_earning_ratio:本益比',
