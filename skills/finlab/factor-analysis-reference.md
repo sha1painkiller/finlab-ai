@@ -393,8 +393,16 @@ calc_regression_stats(
 
 **Example:**
 ```python
-# Assume ic_df is a time series of factor IC
-from finlab.tools.factor_analysis import calc_regression_stats
+from finlab import data
+from finlab.tools.factor_analysis import calc_ic, calc_regression_stats, generate_features_and_labels
+
+price = data.get('etl:adj_close')
+revenue = data.get('monthly_revenue:當月營收')
+features, labels = generate_features_and_labels({
+    'revenue': (revenue.average(3) / revenue.average(12)).rank(pct=True, axis=1) < 0.3,
+    'momentum': price / price.shift(20) - 1 > 0,
+}, resample=revenue.index)
+ic_df = calc_ic(features, labels, rank=True)  # time series of factor IC
 
 trend_stats = calc_regression_stats(ic_df)
 print(trend_stats.head())
