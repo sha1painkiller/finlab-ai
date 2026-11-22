@@ -176,6 +176,12 @@ print(report.stop_loss)  # None: no single threshold to report
 - **Description:** Inclusive cutoff for positions, prices and the report (`creturn`, `trades`, stats). Position rows and trade prices after `end_date` are dropped; open trades are valued at the last bar on or before it and stay open in `report.trades`. A bare date (e.g. `'2023-12-31'`) covers that whole day. `None` infers the end from signal spacing. Raises `ValueError` if `end_date` is earlier than the first position date. *(v2.1.0)*
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+
 report = sim(position, resample="M", end_date="2023-12-31", upload=False)
 print(report.creturn.index[-1])  # last trading bar <= 2023-12-31
 ```
@@ -303,6 +309,12 @@ The `sim()` function returns a `Report` object with multiple APIs for accessing 
 Access individual metrics via the `Metrics` instance:
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+
 report = sim(position, resample="M", upload=False)
 
 # Individual metric methods
@@ -316,6 +328,13 @@ print(f"Max Drawdown: {report.metrics.max_drawdown():.2%}")
 Returns a flat dictionary with all stats. Useful for batch access:
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+report = sim(position, resample="M", upload=False)
+
 stats = report.get_stats()
 
 # Dictionary keys (note: different names than metrics methods!)
@@ -342,6 +361,13 @@ print(f"Total Return: {stats['total_return']:.2%}")
 Returns a nested dictionary organized by category:
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+report = sim(position, resample="M", upload=False)
+
 metrics = report.get_metrics()
 
 # Structured access
@@ -389,6 +415,12 @@ report.to_html(path: str, title: str | None = None) -> None
 **When to use:** after any `sim()` call the user will review (batch-run exception: see SKILL.md Step 4.5). It is the file the user actually opens to evaluate the strategy. Print-only summaries hide the equity curve and trade list and are not a substitute.
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+
 report = sim(position, resample="M", upload=False)
 report.to_html("report.html")
 # tell the user the path; they open it in a browser
@@ -396,6 +428,14 @@ report.to_html("report.html")
 
 For multiple strategies in one session, use descriptive filenames and per-report tab titles so the user can tell them apart without opening the file:
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+pb = data.get('price_earning_ratio:股價淨值比')
+pos_a = close.pct_change(20).is_largest(10)
+pos_b = pb[pb > 0].is_smallest(10)
+
 sim(pos_a, name="Momentum").to_html("momentum.html", title="Momentum")
 sim(pos_b, name="Value").to_html("value.html", title="Value")
 ```
@@ -403,6 +443,13 @@ sim(pos_b, name="Value").to_html("value.html", title="Value")
 ### Other Useful Methods
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+report = sim(position, resample="M", upload=False)
+
 # Display interactive report inside Jupyter / IPython only
 report.display()
 
@@ -567,6 +614,15 @@ Define the DataFrame structure for your trading positions. The index should be a
 
 **Example:**
 ```python
+from finlab import data
+
+close = data.get('price:收盤價')
+volume = data.get('price:成交股數')
+revenue = data.get('monthly_revenue:當月營收')
+sma20 = close.average(20)
+sma60 = close.average(60)
+rev_growth = revenue.pct_change(12)
+
 # Simple position without explicit sell condition
 position = (close > sma20) & (rev_growth > 0.1)
 
@@ -598,7 +654,10 @@ Test your strategy's performance and make adjustments as needed.
 
 **Example:**
 ```python
-from finlab import backtest
+from finlab import backtest, data
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
 
 # Simple backtest
 report = backtest.sim(position, resample='M')
@@ -625,6 +684,9 @@ report.to_html("report.html")  # the file is what the user opens
 *(v2.0.0)* Quota, missing-dataset and signed-download failures raise `DataError` subclasses. VIP-only refusals and partial download failures raise built-in `RuntimeError`, and `sim()` input errors raise `ValueError` / `TypeError`:
 
 ```python
+import logging
+
+from finlab import backtest, data
 from finlab.exceptions import (
     FinlabError,      # root — catch-all for finlab-specific errors
     DataError,        # data fetch / parsing / schema
@@ -641,7 +703,11 @@ from finlab.exceptions import (
     QuotaExceededError,    # (v2.2.14) DataError and RuntimeError; daily download quota exhausted
 )
 
+logger = logging.getLogger(__name__)
+
 try:
+    close = data.get('price:收盤價')
+    position = close.pct_change(20).is_largest(10)
     report = backtest.sim(position, resample='M')
 except QuotaExceededError:
     logger.error("quota exhausted — stop the batch, retry after 08:00 UTC+8")
