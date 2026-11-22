@@ -87,6 +87,8 @@ willr = data.indicator("WILLR", adjust_price=False, resample="D", timeperiod=14)
 ### Moving Averages and Bands
 
 ```python
+from finlab import data
+
 # Simple Moving Average
 sma = data.indicator("SMA", adjust_price=False, resample="D", timeperiod=30)
 
@@ -107,6 +109,8 @@ tema = data.indicator("TEMA", adjust_price=False, resample="D", timeperiod=30)
 ### Volatility Indicators
 
 ```python
+from finlab import data
+
 # ATR - Average True Range
 atr = data.indicator("ATR", adjust_price=False, resample="D", timeperiod=14)
 
@@ -120,6 +124,8 @@ trange = data.indicator("TRANGE", adjust_price=False, resample="D")
 ### Volume Indicators
 
 ```python
+from finlab import data
+
 # AD - Chaikin A/D Line
 ad = data.indicator("AD", adjust_price=False, resample="D")
 
@@ -179,6 +185,8 @@ price_smallest = 收盤價.is_smallest(10)
 ### Volume-Based Calculations
 
 ```python
+from finlab import data
+
 成交股數 = data.get("price:成交股數")
 
 # 20-day average volume
@@ -191,6 +199,8 @@ vol_cumsum = 成交股數.rolling(20).sum()
 ### Revenue-Based Calculations
 
 ```python
+from finlab import data
+
 當月營收 = data.get("monthly_revenue:當月營收")
 去年同月增減 = data.get("monthly_revenue:去年同月增減(%)")
 
@@ -208,9 +218,12 @@ rev_rise_nsatisfy = 去年同月增減.rank(pct=True, axis=1)
 
 ```python
 import numpy as np
+from finlab import data
+from finlab.backtest import sim
 
 # Rebalance on monthly revenue releases through the backtest API
 rev = data.get("monthly_revenue:當月營收")
+position = rev.average(3) > rev.average(12)
 report = sim(position, resample=rev, upload=False)
 
 # Replace infinity with NaN
@@ -234,6 +247,8 @@ small_inv = data.get("etl:inventory:小於五十張佔比")
 #### Moving Average Strategies
 
 ```python
+from finlab import data
+
 收盤價 = data.get("price:收盤價")
 
 # Price above 60-day MA
@@ -255,6 +270,10 @@ short_ma_pattern = (收盤價 < 收盤價.average(5)) & (收盤價 < 收盤價.a
 #### Price Extreme Conditions
 
 ```python
+from finlab import data
+
+收盤價 = data.get("price:收盤價")
+
 # New 5-day high
 new_high = (收盤價 / 收盤價.rolling(5).max()) == 1
 
@@ -280,6 +299,8 @@ price_pct_cond = 收盤價.pct_change(periods=20) < 0.20
 #### Volume Conditions
 
 ```python
+from finlab import data
+
 成交股數 = data.get("price:成交股數")
 
 # 20-day average volume > 1,000,000
@@ -298,6 +319,10 @@ vol_crash = ((成交股數 / 成交股數.rolling(3).min()) == 1).sustain(5)
 #### Technical Indicator Conditions
 
 ```python
+from finlab import data
+
+收盤價 = data.get("price:收盤價")
+
 # RSI golden cross
 rsi1 = data.indicator("RSI", adjust_price=False, resample="D", timeperiod=14)
 rsi2 = data.indicator("RSI", adjust_price=False, resample="D", timeperiod=28)
@@ -356,6 +381,8 @@ kd_low_golden = (slowk > slowd) & (slowk.shift() < slowd.shift()) & (slowk < 50)
 #### Revenue Growth
 
 ```python
+from finlab import data
+
 去年同月增減 = data.get("monthly_revenue:去年同月增減(%)")
 上月比較增減 = data.get("monthly_revenue:上月比較增減(%)")
 當月營收 = data.get("monthly_revenue:當月營收")
@@ -385,6 +412,8 @@ rev_rise_nsatisfy = 去年同月增減.rank(pct=True, axis=1) > 0.80
 #### Valuation Metrics
 
 ```python
+from finlab import data
+
 本益比 = data.get("price_earning_ratio:本益比")
 股價淨值比 = data.get("price_earning_ratio:股價淨值比")
 殖利率 = data.get("price_earning_ratio:殖利率(%)")
@@ -402,6 +431,8 @@ yield_range = (3 <= 殖利率) & (殖利率 <= 10)
 #### Profitability Metrics
 
 ```python
+from finlab import data
+
 營運現金流 = data.get("fundamental_features:營運現金流")
 營業毛利率 = data.get("fundamental_features:營業毛利率")
 營業利益率 = data.get("fundamental_features:營業利益率")
@@ -443,6 +474,8 @@ roe_trend = (ROE綜合損益 > 0).sustain(4)
 #### Leverage Metrics
 
 ```python
+from finlab import data
+
 負債比率 = data.get("fundamental_features:負債比率")
 
 # Debt ratio < 50% for 4 consecutive quarters
@@ -487,6 +520,8 @@ position = 外資[連續同買].is_largest(10)
 #### Shareholding Distribution
 
 ```python
+from finlab import data
+
 # Use data.search('inventory') to find available ETL datasets
 boss_ratio = data.get("etl:inventory:大於四百張佔比")
 boss800_ratio = data.get("etl:inventory:大於八百張佔比")
@@ -522,6 +557,8 @@ boss_hold_rise = 董監持有股數占比.rise(1)
 #### Day Trading and Margin
 
 ```python
+from finlab import data
+
 當日沖銷交易成交股數 = data.get("intraday_trading:當日沖銷交易成交股數")
 成交股數 = data.get("price:成交股數")
 融資使用率 = data.get("margin_transactions:融資使用率")
@@ -622,6 +659,9 @@ disposal_stock_filter = data.get("etl:disposal_stock_filter")
 full_cash_delivery_stock_filter = data.get("etl:full_cash_delivery_stock_filter")
 
 # Filter out KY stocks
+close = data.get("price:收盤價")
+position = close > close.average(60)  # any boolean position
+
 sc = data.get("security_categories")
 position_col = position.columns
 ky_filter = position_col[~position_col.isin(list(sc[sc["name"].str.contains("KY")]["stock_id"]))]
