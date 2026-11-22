@@ -24,11 +24,11 @@ compatibility: Requires Python 3.10+ and uv package manager (https://docs.astral
    source $HOME/.local/bin/env 2>/dev/null  # Add uv to current shell
    ```
 
-2. **FinLab is installed via uv** (requires >= 2.2.15):
+2. **FinLab is installed via uv** (requires >= 2.3.9):
 
    ```bash
    uv python install 3.12  # Ensure Python is available (skip if already installed)
-   uv pip install --system "finlab>=2.2.15" 2>/dev/null || uv pip install "finlab>=2.2.15"
+   uv pip install --system "finlab>=2.3.9" 2>/dev/null || uv pip install "finlab>=2.3.9"
    ```
 
    **Or use `uv run` for zero-setup execution** (recommended for one-off scripts):
@@ -63,6 +63,8 @@ compatibility: Requires Python 3.10+ and uv package manager (https://docs.astral
    Set all three exported variables — `FINLAB_REFRESH_TOKEN`, `FINLAB_SESSION_ID`, and `FINLAB_API_KEY` — in the headless environment. FinLab uses them automatically. Treat the output as credentials: use your platform's secret storage and do not paste it into chat or commit it.
 
    **Google Colab:** run `finlab.login()` in a cell and follow the login link.
+
+   **First run for a human user** *(v2.3.1)*: `python -m finlab quickstart [--market tw|us]` logs in if needed, writes an editable strategy script (`finlab_quickstart.py`) to the current folder, backtests it and opens the HTML report. An existing script is rerun unchanged.
 
    **Migrating from legacy tokens:** `FINLAB_API_TOKEN` and `finlab.login('<api_token>')` are deprecated. Run `python -m finlab migrate`, set up browser login or the three environment variables above, then remove the old token from your configuration.
 
@@ -352,6 +354,29 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 
 Short version pointers for features added in recent releases. Each reference file tags the exact API with `(vX.Y.Z)`.
 
+**v2.3.9** (2026-11-13)
+- `data.research(keyword, market=)` lists validated Factor Forge factors and their `data.get` keys without downloading — see [best-practices.md](best-practices.md)
+
+**v2.3.5** (2026-11-05)
+- `sim(retain_initial_cash=True)` starts the equity curve and CAGR/Sharpe at the first position date, including leading cash — see [backtesting-reference.md](backtesting-reference.md)
+
+**v2.3.1** (2026-11-02)
+- **Behavior change:** `pct_change()` no longer forward-fills gaps (NaN at either end gives NaN); use `.ffill().pct_change()` to reproduce older backtests. `fillna(<bool>)` keeps boolean frames boolean — see [dataframe-reference.md](dataframe-reference.md)
+- `python -m finlab quickstart` (first backtest + report) and `python -m finlab skill install` (installs this skill for Claude Code, Codex, Cursor; use v2.3.9+, which fixed its HTTPS certificate check on Pythons without a system CA bundle)
+
+**v2.2.23** (2026-10-29)
+- `rolling()` computes columns concurrently (same results); `USFundMarket` drops 2016–2023 exchange-holiday weekdays on which only a few mutual funds carry prices
+
+**v2.2.22** (2026-10-29)
+- New brokers `KGIAccount` (凱基) and `YuantaAccount` (元大) — see [trading-reference.md](trading-reference.md)
+
+**v2.2.20** (2026-10-27)
+- `sim()` warns when position columns without prices hold > 10% of the weight (was: < 10% of columns matched) — see [backtesting-reference.md](backtesting-reference.md)
+- Default `tax_ratio`: `HKFundMarket`/`KRFundMarket`/`UKFundMarket` → `0`; `HKMarket` `0.0013` → `0.002`; `KRMarket` `0.0023` → `0.002` — see [backtesting-reference.md](backtesting-reference.md)
+
+**v2.2.18** (2026-10-26)
+- The off-schedule correction warning added in v2.2.10 was removed; `data.get()` no longer logs it
+
 **v2.2.16** (2026-10-21)
 - `data.indicator()` returns NaN after a stock has gone 20 bars without a price (delisted) instead of forward-filling its last value — see [backtesting-reference.md](backtesting-reference.md)
 
@@ -365,7 +390,7 @@ Short version pointers for features added in recent releases. Each reference fil
 
 **v2.2.10** (2026-10-10)
 - `feature.combine()` / `label.return_percentage()` accept a `DatetimeIndex` `resample`; MultiIndex (qlib) features are now resampled — see [machine-learning-reference.md](machine-learning-reference.md)
-- `data.get()` logs a warning when a dataset was corrected outside its schedule, with the `as_of=` value that reproduces the pre-correction data — see [best-practices.md](best-practices.md)
+- `data.get()` logged a warning when a dataset was corrected outside its schedule (removed in v2.2.18); for pre-correction data use `as_of=` — see [data-reproducibility.md](data-reproducibility.md)
 
 **v2.2.9** (2026-10-10)
 - `DelistedHoldingWarning` removed (`ImportError` on import); delisted holdings are still sold — see [backtesting-reference.md](backtesting-reference.md)
