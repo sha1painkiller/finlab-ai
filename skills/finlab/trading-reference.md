@@ -159,6 +159,8 @@ if not status['final_ready']:
 | Sinopac (永豐) | `SHIOAJI_API_KEY`, `SHIOAJI_SECRET_KEY`, `SHIOAJI_CERT_PERSON_ID`, `SHIOAJI_CERT_PATH`, `SHIOAJI_CERT_PASSWORD` |
 | Taishin (台新，原元富) | `TAISHIN_NATIONAL_ID`, `TAISHIN_ACCOUNT`, `TAISHIN_ACCOUNT_PASS`, `TAISHIN_CERT_PATH`, `TAISHIN_CERT_PASS` |
 | Fubon (富邦) | `FUBON_NATIONAL_ID`, `FUBON_ACCOUNT_PASS`, `FUBON_CERT_PATH` |
+| KGI (凱基) *(v2.2.22)* | `KGI_PERSON_ID`, `KGI_PASSWORD`; optional `KGI_ACCOUNT` |
+| Yuanta (元大) *(v2.2.22)* | `YUANTA_ACCOUNT`, `YUANTA_PASSWORD`, `YUANTA_API_DIR`; `YUANTA_CERT_PATH`, `YUANTA_CERT_PASSWORD` on macOS/Linux |
 
 ---
 
@@ -297,6 +299,56 @@ os.environ['FUBON_CERT_PATH'] = '/path/to/cert.pfx'
 
 acc = FubonAccount()
 ```
+
+### KGI (凱基證券) *(v2.2.22)*
+
+Uses the official `kgisuperpy` SDK (`pip install kgisuperpy`). Ordering and account queries run on **Windows and Linux only** (the SDK has no macOS order component). Apply for the certificate and complete KGI's API application and test first: <https://superpy.kgieworld.com.tw/kgipythonapi/guide/tw/prefix>.
+
+**Import:**
+```python
+from finlab.online.kgi_account import KGIAccount
+```
+
+**Environment Variables:**
+```bash
+export KGI_PERSON_ID='A123456789'
+export KGI_PASSWORD='password'
+export KGI_ACCOUNT='1234567'   # optional; defaults to the first securities account
+```
+
+**Usage:**
+```python
+acc = KGIAccount()                   # production
+# acc = KGIAccount(simulation=True)  # KGI simulation environment
+```
+
+`KGIAccount(person_id=None, password=None, account=None, simulation=False)` — arguments override the environment variables. Raises `ConnectionError` when login fails and `ValueError` when `account` is not a securities account under that ID.
+
+### Yuanta (元大證券) *(v2.2.22)*
+
+Uses Yuanta's SPARK API (.NET 8 component called through `pythonnet`). Works on Windows, macOS and Linux. Setup: install the .NET 8 SDK, `pip install pythonnet`, then download and unzip the Python component for your platform from <https://www.yuanta.com.tw/file-repository/content/API/page/index.html>; `YUANTA_API_DIR` points to that folder. Sign the online risk disclosure, pass the API test, and ask your broker to enable API access before first use.
+
+**Import:**
+```python
+from finlab.online.yuanta_account import YuantaAccount
+```
+
+**Environment Variables:**
+```bash
+export YUANTA_ACCOUNT='98761234567'          # branch (4) + account (7); the "S" prefix is added if missing
+export YUANTA_PASSWORD='password'
+export YUANTA_API_DIR='/path/to/spark_api'
+export YUANTA_CERT_PATH='/path/to/cert.pfx'  # required on macOS/Linux; Windows uses the system certificate
+export YUANTA_CERT_PASSWORD='cert_password'
+```
+
+**Usage:**
+```python
+acc = YuantaAccount()            # production
+# acc = YuantaAccount(uat=True)  # Yuanta UAT (test) environment
+```
+
+`YuantaAccount` throttles each SPARK API function to its limit (3 queries or 10 orders per second), so bursts wait instead of failing. After a request times out, create a new `YuantaAccount` (later calls raise `RuntimeError`).
 
 ---
 
