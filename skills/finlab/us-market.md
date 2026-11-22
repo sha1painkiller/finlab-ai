@@ -273,6 +273,10 @@ The underlying principle: include a sector if and only if the factor you are com
 Reverse-split artefacts, ticker reuse, and data-feed errors produce stocks with implausible daily returns (hundreds of tickers have more than five days of ±50% moves; the largest single-day return exceeds 10^9 %). Filter them out with a **rolling** rather than full-history check to avoid lookahead:
 
 ```python
+from finlab import data
+
+data.set_market('us')
+close         = data.get('us_price:adj_close')
 rets          = close.pct_change()
 extreme_today = rets.abs() >= 0.5
 # exclude a stock from day T+1 onward once it has shown an extreme move,
