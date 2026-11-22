@@ -328,6 +328,7 @@ rank(*args, valid=None, **kwargs) -> FinlabDataFrame
 
 **Example:**
 ```python
+import talib
 from finlab import data
 
 pb = data.get('price_earning_ratio:股價淨值比')
@@ -343,7 +344,7 @@ close = data.get('price:收盤價')
 ratio = close / close.shift(5)
 # fillna(1) is needed for SLOPE computation, but those fake values
 # should not count in percentile ranking
-score = ratio.fillna(1).apply(some_func)
+score = ratio.fillna(1).apply(lambda s: talib.LINEARREG_SLOPE(s, timeperiod=5))
 score.rank(axis=1, pct=True, valid=ratio.notna())
 
 # WARNING: Time-series ranking triggers LookaheadWarning
@@ -822,7 +823,20 @@ df.sector.bucket(n)
 **Custom classification** *(v2.0.16)* — call the accessor with `by` to replace the default `security_categories` industry map. Works with every `sector.*` method:
 
 ```python
+import pandas as pd
+from finlab import data
+
+roe = data.get('fundamental_features:ROE稅後')
+
 my_map = {'2330': 'AI供應鏈', '2317': 'AI供應鏈', '2882': '金融'}
+my_series = pd.Series(my_map)
+# time-varying groups need a DatetimeIndex (quarterly 'YYYY-QN' labels raise TypeError)
+theme_df = pd.DataFrame(
+    [{'2330': 'AI供應鏈', '2317': '代工', '2882': '金融'},
+     {'2330': 'AI供應鏈', '2317': 'AI供應鏈', '2882': '金融'}],
+    index=pd.to_datetime(['2020-01-01', '2024-01-01']),
+)
+
 roe.sector(my_map).rank()          # dict: stock_id -> group
 roe.sector(my_series).rank()       # pd.Series indexed by stock_id
 roe.sector(theme_df).rank()        # time-varying: DataFrame (index=dates, columns=stock_ids)
@@ -833,6 +847,10 @@ Stocks not listed in `by` are excluded (NaN in the result) — a custom map defi
 **Sector-value broadcasting** *(v2.0.16)* — `df.sector.map(mapping)` broadcasts group-level scalars to the full DataFrame shape, for composing with factor scores:
 
 ```python
+from finlab import data
+
+roe = data.get('fundamental_features:ROE稅後')
+
 # Tilt within-industry ranks by a per-industry conviction weight
 score = roe.sector.rank() * roe.sector.map({'半導體業': 1.2, '金融保險業': 0.8})
 ```
