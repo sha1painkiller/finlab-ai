@@ -40,6 +40,7 @@ sim(
     upload: Union[bool, None] = None,
     *,
     end_date: Union[str, datetime.date, pd.Timestamp, None] = None,
+    retain_initial_cash: bool = False,
     metrics_only: bool = False,
     notification_enable: bool = False,
     line_access_token: str = ''
@@ -80,8 +81,22 @@ sim(
 
 #### tax_ratio
 - **Type:** `Union[float, None]`
-- **Default:** `None` → market-specific *(v1.5.9)* — TW: `3/1000`, US: `0`
+- **Default:** `None` → market-specific *(v1.5.9)*, see table below
 - **Description:** Transaction tax ratio applied when selling stocks. Resolved from the active `Market` when omitted.
+
+Market defaults as of v2.3.12 (`fee_ratio` / `tax_ratio`):
+
+| Market | Stocks | Funds/ETFs (`*FundMarket`) |
+|---|---|---|
+| TW (`TWMarket`, `ROTCMarket`) | `0.001425` / `0.003` | — |
+| TW CB (`TWCBMarket`) | `0.001425` / `0.001` | — |
+| US | `0` / `0` | `0` / `0` |
+| HK | `0.001` / `0.002` | `0.001` / `0` |
+| KR | `0.00015` / `0.002` | `0.00015` / `0` |
+| JP | `0` / `0` | `0` / `0` |
+| UK | `0` / `0.005` | `0` / `0` |
+
+*(v2.2.20)* ETFs are exempt from stamp duty or transaction tax in HK, KR and UK, so `HKFundMarket`, `KRFundMarket` and `UKFundMarket` default to `tax_ratio=0` (before: the stock rate). Stock tax changed at the same time: HK `0.0013` → `0.002` (0.1% stamp duty each side, charged on the sell), KR `0.0023` → `0.002`. Pass `tax_ratio=` explicitly to reproduce older results.
 
 #### name
 - **Type:** `str`
@@ -165,6 +180,23 @@ report = sim(position, resample="M", end_date="2023-12-31", upload=False)
 print(report.creturn.index[-1])  # last trading bar <= 2023-12-31
 ```
 
+#### retain_initial_cash
+- **Type:** `bool` (keyword-only)
+- **Default:** `False`
+- **Description:** *(v2.3.5)* Start the equity curve at the first position date (no earlier than the first available price), keeping leading days spent in cash or flat. `report.creturn`, CAGR, Sharpe and the stats start date then cover that full period; trades and resampling are unchanged. A start date that is not a trading day carries the preceding NAV forward. `False` trims leading unit-NAV rows, so the curve starts at the first day with a holding. Use it with a sliced position and `end_date` to compare strategies over the same fixed window.
+
+```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get('price:收盤價')
+position = close.pct_change(20).is_largest(10)
+
+report = sim(position.loc['2021-01-04':], resample='M',
+             retain_initial_cash=True, end_date='2024-12-31', upload=False)
+print(report.creturn.index[0])  # 2021-01-04 (False: 2021-01-29, the first month-end rebalance)
+```
+
 #### metrics_only
 - **Type:** `bool` (keyword-only)
 - **Default:** `False`
@@ -173,6 +205,10 @@ print(report.creturn.index[-1])  # last trading bar <= 2023-12-31
 ### Returns
 
 An instance of `Report` containing performance metrics, trades, and additional analyses.
+
+### Position Columns Without Prices *(v2.2.20)*
+
+`sim()` backtests only position columns that exist in the market's price table and silently drops the rest. It emits a `UserWarning` listing the held, unpriced symbols when they carry more than 10% of the position's total absolute weight (before 2.2.20: when fewer than 10% of columns matched). It raises `ValueError` when no column matches — usually a position built from another market's data (e.g. TW symbols with `market=USMarket()`).
 
 ### Delisted Holdings *(v2.1.0)*
 
