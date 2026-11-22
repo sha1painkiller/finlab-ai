@@ -536,6 +536,11 @@ Create factors or indicators that will be used in your strategy.
 
 **Example:**
 ```python
+from finlab import data
+
+close = data.get('price:收盤價')
+revenue = data.get('monthly_revenue:當月營收')
+
 # Calculate moving averages
 sma20 = close.average(20)
 sma60 = close.average(60)
