@@ -178,6 +178,8 @@ When the strategy trades tickers such as SPY, QQQ, sector SPDRs, or leveraged ET
 | `tax_ratio`         | 0          | No trading stamp duty.                                   |
 | `trade_at_price`    | `'close'`  | Close-price execution; same rationale as equities.      |
 
+*(v2.2.23)* `us_fund_price` carries values for 100+ mutual funds on some 2016–2023 exchange-holiday weekdays. When `trade_at_price` is a column name, `USFundMarket` drops a row whose count of priced symbols is under half of both neighbouring rows, so no trade fills on those days. A custom price DataFrame passed as `trade_at_price` is used as given.
+
 Sector-rotation example — hold the strongest of SPY/QQQ each month:
 ```python
 from finlab import data
