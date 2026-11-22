@@ -43,6 +43,8 @@ report = sim(position, resample="M")
 **DO:** Limit to top N < 50 stocks using these methods.
 
 ```python
+from finlab import data
+
 # Select top 10 stocks by lowest P/E
 pe = data.get("price_earning_ratio:本益比")
 position = pe.is_smallest(10)
@@ -61,6 +63,8 @@ position = momentum[condition].is_largest(15)
 **DO:** Call `data.indicator()` without passing OHLCV data.
 
 ```python
+from finlab import data
+
 # Correct - no OHLCV parameters
 rsi = data.indicator("RSI", timeperiod=14)
 
@@ -85,6 +89,10 @@ upperband, middleband, lowerband = data.indicator(
 **DON'T:** Pass close price or OHLCV data to indicators.
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
 # ❌ WRONG - don't pass close
 rsi = data.indicator("RSI", close, timeperiod=14)  # ERROR
 rsi = data.indicator("RSI", close=close, timeperiod=14)  # v2.2.7: ValueError that suggests talib.abstract per stock
@@ -109,6 +117,10 @@ rsi = data.indicator("RSI", strict=True, timeperiod=14)        # v2.2.4: also re
 **DO:** Use `.shift()` to access historical data.
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
 # Correct - get previous day's close
 prev_close = close.shift(1)
 
@@ -121,6 +133,10 @@ golden_cross = (sma20 > sma60) & (sma20.shift() < sma60.shift())
 **DON'T:** Use `.iloc[-2]` or similar indexing (can cause lookahead bias).
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
 # ❌ WRONG
 prev_close = close.iloc[-2]  # DON'T USE THIS
 ```
@@ -221,6 +237,12 @@ Missing cells stay NaN. Research validation is not a return guarantee, and the p
 **DO:** Treat the FinLab-generated HTML file as the actual deliverable of a backtest. Numbers in the terminal are not a substitute — the user needs to see the equity curve, drawdown, and the trade table to judge whether the strategy is worth keeping.
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get("price:收盤價")
+position = close.pct_change(20).is_largest(10)
+
 report = sim(position, resample="M", upload=False)
 report.to_html("report.html")   # equity curve + metrics + trade list, browser-openable
 stats = report.get_stats()
@@ -237,6 +259,12 @@ When running several strategies in one session, name the files so they don't clo
 **DO:** Always specify `resample` parameter in `sim()`.
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get("price:收盤價")
+position = close.pct_change(20).is_largest(10)
+
 # Monthly rebalancing
 sim(position, resample="M")
 
@@ -259,6 +287,10 @@ sim(position, resample=rev.index)
 **Reason:** Floating point precision issues.
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
 # ❌ BAD
 condition = (close == 100.0)
 
@@ -271,6 +303,8 @@ condition = (close > 99.9) & (close < 100.1)
 **Reason:** FinLabDataFrame aligns indices and columns automatically. When quarterly string-index data (Taiwan `fundamental_features:*`, US `us_income_statement:*` / `us_balance_sheet:*`) meets daily data through operators or boolean indexing, internal `reshape()` calls `index_str_to_date()`, then forward-fills on the combined date grid. `monthly_revenue:*` is already indexed by disclosure deadline and forward-fills the same way.
 
 ```python
+from finlab import data
+
 # Automatic PIT alignment
 close = data.get("price:收盤價")
 roe = data.get("fundamental_features:ROE稅後")
@@ -280,6 +314,8 @@ position = (close > close.average(60)) & (roe > 0)
 The same pattern applies to pure quarterly factors: calculate them on the original string index first, then combine with daily conditions directly.
 
 ```python
+from finlab import data
+
 net_income = data.get("us_income_statement:net_income")
 equity = data.get("us_balance_sheet:total_stockholders_equity")
 close = data.get("us_price:adj_close")
@@ -295,6 +331,13 @@ Never use `reindex()` or `reindex_like()`, including on final positions. Use `si
 **Reason:** FinLabDataFrame methods are vectorized and much faster.
 
 ```python
+import pandas as pd
+from finlab import data
+
+close = data.get("price:收盤價").loc["2024", ["2330", "2317"]]  # small slice: the loop is slow
+sma60 = close.average(60)
+position = pd.DataFrame(False, index=close.index, columns=close.columns)
+
 # ❌ BAD - iterating over rows
 for date in close.index:
     for stock in close.columns:
@@ -310,6 +353,12 @@ position = close > sma60
 **Reason:** These filters remove many stocks and should only be applied when explicitly requested.
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
+position = close > close.average(60)
+
 # ❌ DON'T do this by default
 is_regular = (
     data.get("etl:noticed_stock_filter") &
@@ -326,6 +375,8 @@ position = position & is_regular
 **Reason:** `data.indicator()` automatically uses correct price data.
 
 ```python
+from finlab import data
+
 # ❌ WRONG
 close = data.get("price:收盤價")
 rsi = data.indicator("RSI", close, timeperiod=14)  # ERROR
@@ -339,6 +390,14 @@ rsi = data.indicator("RSI", timeperiod=14)  # Automatically uses close
 **Reason:** When extracting `.iloc[-1]` from DataFrames with different columns, the resulting Series have different indices. Boolean indexing then fails with `IndexingError`.
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
+pe = data.get("price_earning_ratio:本益比")
+latest_pe = pe.iloc[-1]
+latest_combined = (close > close.average(60)).iloc[-1]
+
 # ❌ BAD - indices may not match
 selected = latest_pe[latest_combined]  # IndexingError
 
@@ -358,6 +417,8 @@ selected = latest_pe.loc[common][latest_combined.loc[common]]
 **DO:** Keep index intact, even if it contains strings like "2025Q1".
 
 ```python
+from finlab import data
+
 # ✅ GOOD - leave index as-is
 revenue = data.get("monthly_revenue:當月營收")
 # Index is the disclosure deadline: 2022-01-10 holds December 2021 revenue
@@ -416,6 +477,10 @@ if not result.passed:
 ### Pattern 1: Limit to Top X% of Indicator
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
 # Select stocks in top 30% by momentum
 momentum = close / close.shift(60) - 1
 top_momentum = momentum.rank(axis=1, pct=True) > 0.7
@@ -439,6 +504,8 @@ pct = score.rank(axis=1, pct=True, valid=ratio.notna())
 ### Pattern 2: Limit to Top N Stocks
 
 ```python
+from finlab import data
+
 # Select top 10 stocks with lowest P/B ratio
 pb = data.get("price_earning_ratio:股價淨值比")
 position = pb.is_smallest(10)
@@ -452,6 +519,8 @@ position = pb[liquid_stocks].is_smallest(15)
 ### Pattern 3: Entry/Exit with `hold_until()`
 
 ```python
+from finlab import data
+
 close = data.get("price:收盤價")
 pb = data.get("price_earning_ratio:股價淨值比")
 
@@ -470,6 +539,8 @@ position = entries.hold_until(
 ### Pattern 4: Industry Ranking
 
 ```python
+from finlab import data
+
 # Select top 20% within each industry
 roe = data.get("fundamental_features:ROE稅後")
 industry_top = roe.industry_rank() > 0.8
@@ -482,6 +553,12 @@ industry_top = roe.industry_rank() > 0.8
 ### Pattern 1: Basic Backtest
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get("price:收盤價")
+position = close.pct_change(20).is_largest(10)
+
 sim(position, resample="M")
 ```
 
@@ -490,6 +567,12 @@ sim(position, resample="M")
 See [end_date](backtesting-reference.md#end_date) for the inclusive cutoff.
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get("price:收盤價")
+position = close.pct_change(20).is_largest(10)
+
 sim(position.loc['2020':], resample="M", end_date='2023-12-31')
 ```
 
@@ -499,7 +582,10 @@ Without `end_date`, `sim()` infers where a sliced backtest ends from the signal 
 
 ```python
 import optuna
+from finlab import data
 from finlab.backtest import sim
+
+close = data.get("price:收盤價")
 
 def run_strategy(params):
     """Strategy function that returns a report"""
@@ -526,6 +612,10 @@ print(f"Best params: {study.best_params}")
 ### Pattern 4: Evaluate Strategy Condition Coverage
 
 ```python
+from finlab import data
+
+close = data.get("price:收盤價")
+
 # Check how often the condition is True (on average across stocks)
 condition = close > close.average(60)
 coverage = condition.sum(axis=1).loc['2020':].mean()
@@ -535,6 +625,12 @@ print(f"Average stocks meeting condition: {coverage:.1f}")
 ### Pattern 5: Adjust Rebalance Frequency
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get("price:收盤價")
+position = close.pct_change(20).is_largest(10)
+
 # Weekly
 sim(position, resample="W")
 
@@ -552,6 +648,12 @@ sim(position, resample=rev.index)
 ### Pattern 6: Adjust Rebalance Offset
 
 ```python
+from finlab import data
+from finlab.backtest import sim
+
+close = data.get("price:收盤價")
+position = close.pct_change(20).is_largest(10)
+
 # Rebalance 7 days after each month-end
 sim(position, resample="M", resample_offset="7D")
 
@@ -658,6 +760,8 @@ print(pd.DataFrame(rows))
 1. **Break down experiments into small steps**
 
    ```python
+   from finlab import data
+
    # Step 1: Fetch data
    close = data.get("price:收盤價")
    print(close.head())
