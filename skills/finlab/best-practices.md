@@ -196,6 +196,26 @@ print(info['category_description'], info['layout'], info['schedule'], info['colu
 
 `describe()` raises `KeyError` for unknown keys. Its `index_end` is the catalog's last index label (possibly a future period label), not the latest observation date.
 
+### ✅ Reuse Validated Factors with `data.research()` *(v2.3.9)*
+
+`data.research(keyword='', *, market=None) -> list[dict]` lists FinLab Factor Forge factors that passed review and have a downloadable history, without downloading any matrix. `keyword` matches the id, Chinese/English name, formula and summary; `''` lists all. `market` defaults to the active market; only `'tw'` has factors (other markets return `[]`).
+
+Each dict has `id`, `name`, `name_en`, `dataset` (the exact `data.get` key, `factor_forge:<name>`), `definition` (direction and formula tree), `summary`, `family`, `signal_as_of`, `evaluated_through` and `history`. Values already include the approved direction: **larger is better**, so select with `is_largest()`.
+
+```python
+from finlab import data
+from finlab.backtest import sim
+
+factors = data.research('投信', market='tw')
+print(len(factors), factors[0]['name'], factors[0]['dataset'])
+
+signal = data.get(factors[0]['dataset'])   # daily FinlabDataFrame; VIP access required
+position = signal.is_largest(20)
+report = sim(position.loc['2020':], resample='M', upload=False)
+```
+
+Missing cells stay NaN. Research validation is not a return guarantee, and the published history is not proof that each value was available on that date in real time. Verify the factor out of sample before trading it.
+
 ### ✅ Always Write `report.to_html()` After `sim()`
 
 **DO:** Treat the FinLab-generated HTML file as the actual deliverable of a backtest. Numbers in the terminal are not a substitute — the user needs to see the equity curve, drawdown, and the trade table to judge whether the strategy is worth keeping.
