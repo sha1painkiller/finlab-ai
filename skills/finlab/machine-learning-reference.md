@@ -185,9 +185,11 @@ label.return_percentage(
 
 **Example:**
 ```python
-from finlab.ml import label
+from finlab import data
+from finlab.ml import feature, label
 
-# Assume features is your feature DataFrame
+features = feature.combine({'pb': data.get('price_earning_ratio:股價淨值比')}, resample='M')
+
 y = label.return_percentage(features.index, resample='M', period=1)
 ```
 
@@ -220,7 +222,10 @@ label.excess_over_mean(
 
 **Example:**
 ```python
-from finlab.ml import label
+from finlab import data
+from finlab.ml import feature, label
+
+features = feature.combine({'pb': data.get('price_earning_ratio:股價淨值比')}, resample='M')
 
 # Excess return over market mean
 y = label.excess_over_mean(features.index, resample='M', period=1)
