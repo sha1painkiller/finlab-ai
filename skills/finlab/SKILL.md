@@ -334,38 +334,12 @@ Pick a descriptive filename when running more than one strategy in the same sess
 
 See the "`report.to_html()` — the canonical deliverable" section of [backtesting-reference.md](backtesting-reference.md) for details on what the file contains.
 
-### Step 5: Execute Orders (Optional)
-
-**In FinLab Desktop**, when the `previewOrders` and `placeOrder` tools are available, use them instead of the code below: call `previewOrders` (the practice account unless the person names a broker they connected), tell the person the orders in plain words, and call `placeOrder` only after they ask to place them; FinLab Desktop then asks them to approve. Never write order code with broker keys there; if their broker is not connected, call `connectBroker`.
-
-Convert backtest results to live trading. **Never place real orders on your own:** run `create_orders(view_only=True)`, show the user the preview, and call `create_orders()` only after the user confirms those orders in this conversation.
-
-```python
-from finlab.online.order_executor import Position, OrderExecutor
-from finlab.online.sinopac_account import SinopacAccount
-
-# 1. Convert report to position
-position = Position.from_report(report, fund=1000000)
-
-# 2. Connect broker account
-acc = SinopacAccount()
-
-# 3. Create executor and preview orders
-executor = OrderExecutor(position, account=acc)
-executor.create_orders(view_only=True)  # Preview first
-
-# 4. Execute only after the user confirms the preview
-executor.create_orders()
-```
-
-See [trading-reference.md](trading-reference.md) for complete broker setup and OrderExecutor API.
-
 ## Reference Files
 
 | File                                                           | Content                                    |
 | -------------------------------------------------------------- | ------------------------------------------ |
 | [backtesting-reference.md](backtesting-reference.md)           | `sim()` 參數、stop-loss、rebalancing       |
-| [trading-reference.md](trading-reference.md)                   | 券商設定、OrderExecutor、Position          |
+| [cloud-reference.md](cloud-reference.md)                       | `python -m finlab cloud` 雲端排程部署      |
 | [factor-examples.md](factor-examples.md)                       | 60+ 策略範例                               |
 | [dataframe-reference.md](dataframe-reference.md)               | FinLabDataFrame 方法                       |
 | [factor-analysis-reference.md](factor-analysis-reference.md)   | IC、Shapley、因子分析                      |
@@ -373,6 +347,8 @@ See [trading-reference.md](trading-reference.md) for complete broker setup and O
 | [data-reproducibility.md](data-reproducibility.md)             | Historical publications, snapshot replay, quarterly date coverage |
 | [machine-learning-reference.md](machine-learning-reference.md) | ML 特徵工程                                |
 | [us-market.md](us-market.md)                                   | US market specifics: data map, quarterly alignment, defaults, universe construction |
+
+Placing broker orders is not covered by this skill: see the open-source [finlab-online](https://github.com/finlab-python/order_executor) package and its documentation.
 
 ## What's New (since v1.5.8)
 
@@ -390,9 +366,6 @@ Short version pointers for features added in recent releases. Each reference fil
 
 **v2.2.23** (2026-10-29)
 - `rolling()` computes columns concurrently (same results); `USFundMarket` drops 2016–2023 exchange-holiday weekdays on which only a few mutual funds carry prices
-
-**v2.2.22** (2026-10-29)
-- New brokers `KGIAccount` (凱基) and `YuantaAccount` (元大) — see [trading-reference.md](trading-reference.md)
 
 **v2.2.20** (2026-10-27)
 - `sim()` warns when position columns without prices hold > 10% of the weight (was: < 10% of columns matched) — see [backtesting-reference.md](backtesting-reference.md)
@@ -434,7 +407,6 @@ Short version pointers for features added in recent releases. Each reference fil
 - `python -m finlab ai --history [N]`, `--show <ID>` and `--json`
 
 **v2.2.4** (2026-10-04)
-- `finlab.portfolio.TradeReview`: rebuild actual NAV, holdings and trades from real fills — see [trading-reference.md](trading-reference.md)
 - `data.indicator(..., strict=True)` — see [best-practices.md](best-practices.md)
 
 **v2.2.3** (2026-10-04)
@@ -447,7 +419,6 @@ Short version pointers for features added in recent releases. Each reference fil
 
 **v2.2.2** (2026-10-03)
 - **Behavior change**: `data.indicator()` raises `ValueError` on keywords the TA-Lib indicator does not accept (previously ignored silently) — see [best-practices.md](best-practices.md)
-- `PortfolioSyncManager.update()` raises `PortfolioError` and aborts when `total_balance` cannot fund the rebuild — see [trading-reference.md](trading-reference.md)
 
 **v2.2.1** (2026-09-30)
 - `hold_until(..., exit_mode='state'|'event')`: **default restored to `'state'`** (sparse exit signals forward-fill, as in ≤ 2.0.21). 2.1.0–2.2.0 behaved as `'event'`; pass `exit_mode='event'` to reproduce those results — see [dataframe-reference.md](dataframe-reference.md)
@@ -462,7 +433,7 @@ Short version pointers for features added in recent releases. Each reference fil
 - `sim(..., end_date=...)`: keyword-only inclusive backtest cutoff — see [backtesting-reference.md](backtesting-reference.md)
 - `ic(..., method='spearman')`: rank IC — see [factor-analysis-reference.md](factor-analysis-reference.md)
 - `universe.membership(market)`: point-in-time listing eligibility mask; `data.reset_universe()` — see [best-practices.md](best-practices.md)
-- `data.get_calendar('tw')` / `data.readiness()`: trading-calendar and data-freshness checks before the open — see [trading-reference.md](trading-reference.md)
+- `data.get_calendar('tw')` / `data.readiness()`: trading-calendar and data-freshness checks before the open
 - `is_largest` / `is_smallest` emit `TopNPaddingWarning` when tied floor values (e.g. `score * cond` zeros) fill the top N; `pd_df <op> finlab_df` with differing dates or stocks emits `PandasLeftOperandWarning` — put the FinlabDataFrame on the left
 - `DatasetNotFoundError` (with `.suggestions`) for unknown dataset keys; `finlab.login()` raises `LoginError` instead of failing silently
 
@@ -474,7 +445,6 @@ Short version pointers for features added in recent releases. Each reference fil
 
 **v2.0.18** (2026-08-19)
 - `df.rank(axis=1)` **behavior fix**: the cross-sectional fast path previously assigned ordinal ranks (`method="first"`), disagreeing with the documented default `method="average"` — tied cells got distinct percentiles. Ties now share one percentile. Affects discrete / low-cardinality factors; re-check thresholds tuned before 2.0.18 — see [dataframe-reference.md](dataframe-reference.md)
-- `SinopacAccount`: contract lookup now uses shioaji >= 1.7's on-demand `api.contracts` accessor, with the legacy `fetch_contracts` path kept only for shioaji < 1.7 — see [trading-reference.md](trading-reference.md)
 
 **v2.0.17** (2026-08-02)
 - `report.get_benchmark_stats()`: benchmark metrics over the backtest period, same ffn keys as `get_stats()` — no need to recompute from `market.get_benchmark()`
@@ -497,14 +467,13 @@ Short version pointers for features added in recent releases. Each reference fil
 - `data.search(market="rotc")`: scoped to the emerging-market catalog only
 
 **v2.0.1** (2026-04-26)
-- `python -m finlab cloud` *(CLI)*: deploy strategies to the `finlab-auto-update` Cloud Functions runtime with daily, weekly, monthly, or custom cron scheduling in Asia/Taipei (frequency options since v2.2.9) — `deploy`, `get`, `list`, `run`, `logs`, `schedule set/delete`, `delete`, `status`. See [trading-reference.md](trading-reference.md#cloud-strategy-deployment--python--m-finlab-cloud-v201)
+- `python -m finlab cloud` *(CLI)*: deploy strategies to the `finlab-auto-update` Cloud Functions runtime with daily, weekly, monthly, or custom cron scheduling in Asia/Taipei (frequency options since v2.2.9) — `deploy`, `get`, `list`, `run`, `logs`, `schedule set/delete`, `delete`, `status`. See [cloud-reference.md](cloud-reference.md)
 - `sim()` peak RSS ~800 MB lower on full-market monthly strategies (was ~2.0–2.2 GiB → ~1.29 GiB); enables s-tier cloud workers that previously OOM'd
 
 **v2.0.0** (2026-04-22) — major release
 - `finlab.exceptions`: structured error hierarchy (`FinlabError`, `DataError`, `BacktestError`, ...) — see [backtesting-reference.md](backtesting-reference.md)
 - `data.get(lazy=True)` / `data.gets(..., lazy=True)`: batch fetch + deferred compute; `DataContext` holds global data state (`data.truncate_start`, `data.prefer_local_if_exists`, …); scope changes to a block with `with data._default_context.override(truncate_start='2020-01-01'):` (there is no `data.override()`)
 - `df.cs` / `df.sector` / `df.weight` accessors; `rolling().std/var/skew/kurt/median` — see [dataframe-reference.md](dataframe-reference.md)
-- `PositionStreamMixin` for realtime position streaming — see [trading-reference.md](trading-reference.md)
 - `from finlab import FinlabDataFrame` top-level export
 - `backtest.sim()` refactored into 5 testable stages; `eval()` removed from `optimize.combinations`
 
@@ -517,9 +486,6 @@ Short version pointers for features added in recent releases. Each reference fil
 - Report migration to canonical Firestore flow (transparent to users)
 
 **v1.5.9**
-- `finlab.schemas`: typed `PositionEntry`, `OrderEntry`, `PortfolioData` contracts
-- `OrderExecutor.generate_orders(as_entries, quantity_type)` and `generate_order_entries()`
-- `PortfolioSyncManager.get_data_typed()` / `set_data_typed()`
 - `data.get()` 80% quota usage warning
 - `sim()` uses market-specific default `fee_ratio` / `tax_ratio` (no longer hardcoded TW values)
 
